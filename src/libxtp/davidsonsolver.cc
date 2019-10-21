@@ -96,6 +96,10 @@ void DavidsonSolver::printOptions(int operator_size) const {
       XTP_LOG_SAVE(logDEBUG, _log)
           << TimeStamp() << " QR Orthogonalization" << flush;
       break;
+    case ORTHO::SVD:
+      XTP_LOG_SAVE(logDEBUG, _log)
+          << TimeStamp() << " SVD Orthogonalization" << flush;
+      break;
   }
   XTP_LOG_SAVE(logDEBUG, _log)
       << TimeStamp() << " Matrix size : " << operator_size << 'x'
@@ -138,6 +142,8 @@ void DavidsonSolver::set_ortho(std::string method) {
     this->_davidson_ortho = ORTHO::GS;
   else if (method == "QR")
     this->_davidson_ortho = ORTHO::QR;
+  else if (method == "SVD")
+    this->_davidson_ortho = ORTHO::SVD;
   else
     throw std::runtime_error(
         method + " is not a valid Davidson orthogonalization method");
@@ -371,21 +377,77 @@ Eigen::MatrixXd DavidsonSolver::orthogonalize(const Eigen::MatrixXd &V,
       Vout = DavidsonSolver::qr(V);
       break;
     }
+
+    case ORTHO::SVD: {
+      Vout = DavidsonSolver::svd(V);
+      break; 
+    }
   }
   return Vout;
 }
 
 Eigen::MatrixXd DavidsonSolver::qr(const Eigen::MatrixXd &A) const {
 
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed_time;
+
   int nrows = A.rows();
   int ncols = A.cols();
   ncols = std::min(nrows, ncols);
 
+  start = std::chrono::system_clock::now();
   Eigen::HouseholderQR<Eigen::MatrixXd> qr(A);
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ QR Factorization: "
+        << elapsed_time.count() << "secs." << flush;
+
+  start = std::chrono::system_clock::now();
   Eigen::MatrixXd result = qr.householderQ();
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Compute Q: "
+        << elapsed_time.count() << "secs." << flush;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Full Q size: "
+        << result.rows() << "x" << result.cols() << flush;
+
+  start = std::chrono::system_clock::now();
   result.conservativeResize(nrows, ncols);
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Thin Q size: "
+        << result.rows() << "x" << result.cols() << flush;
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Resize Q: "
+          << elapsed_time.count() << "secs." << flush;
+
+
   return result;
 }
+
+Eigen::MatrixXd DavidsonSolver::svd(const Eigen::MatrixXd &A) const {
+
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed_time;
+
+  start = std::chrono::system_clock::now();
+  //Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU);
+  Eigen::BDCSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU);
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ SVD Factorization: "
+        << elapsed_time.count() << "secs." << flush;
+
+
+  start = std::chrono::system_clock::now();
+  Eigen::MatrixXd result = svd.matrixU();
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Compute U: "
+        << elapsed_time.count() << "secs." << flush;
+
+  return result;
+}
+
 
 Eigen::MatrixXd DavidsonSolver::gramschmidt(const Eigen::MatrixXd &A,
                                             int nstart) {
@@ -394,6 +456,7 @@ Eigen::MatrixXd DavidsonSolver::gramschmidt(const Eigen::MatrixXd &A,
     Q.col(j) -= Q.leftCols(j) * (Q.leftCols(j).transpose() * A.col(j));
     if (Q.col(j).norm() <= 1E-12 * A.col(j).norm()) {
       _info = Eigen::ComputationInfo::NumericalIssue;
+      std::cout << Q.col(j).norm() << "  " << A.col(j).norm() << std::endl;
       throw std::runtime_error(
           "Linear dependencies in Gram-Schmidt. Switch to QR");
     }
@@ -401,6 +464,30 @@ Eigen::MatrixXd DavidsonSolver::gramschmidt(const Eigen::MatrixXd &A,
   }
   return Q;
 }
+
+Eigen::MatrixXd DavidsonSolver::gramschmidt_twice(const Eigen::MatrixXd &A,
+                                            int nstart) {
+  Eigen::MatrixXd Q = A;
+  for (int j = nstart; j < A.cols(); ++j) {
+
+    Q.col(j) -= Q.leftCols(j) * (Q.leftCols(j).transpose() * A.col(j));
+    Q.col(j).normalize();
+
+    Q.col(j) -= Q.leftCols(j) * (Q.leftCols(j).transpose() * A.col(j));
+
+    if (Q.col(j).norm() <= 1E-12 * A.col(j).norm()) {
+      _info = Eigen::ComputationInfo::NumericalIssue;
+      throw std::runtime_error(
+          "Linear dependencies in Gram-Schmidt. Switch to QR");
+    }
+
+    Q.col(j).normalize();
+
+
+  }
+  return Q;
+}
+
 
 void DavidsonSolver::restart(const DavidsonSolver::RitzEigenPair &rep,
                              DavidsonSolver::ProjectedSpace &proj,

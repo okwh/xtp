@@ -63,6 +63,8 @@ class DavidsonSolver {
 
     std::chrono::time_point<std::chrono::system_clock> start =
         std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_time;     
+    std::chrono::time_point<std::chrono::system_clock> tmp_start, tmp_end;   
     int op_size = A.rows();
 
     checkOptions(op_size);
@@ -86,7 +88,13 @@ class DavidsonSolver {
       if (proj.search_space > _max_search_space) {
         restart(rep, proj, size_initial_guess);
       } else {
+        tmp_start = std::chrono::system_clock::now();
         updateProjection(A, proj, iiter);
+        tmp_end = std::chrono::system_clock::now();       
+        elapsed_time = tmp_end - tmp_start;
+        XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Update Projection : "
+                                     << elapsed_time.count() << "secs." << flush;
+
       }
 
       // get the ritz vectors
@@ -101,7 +109,12 @@ class DavidsonSolver {
       }
 
       // etend the subspace
+      tmp_start = std::chrono::system_clock::now();
       int nupdate = extendProjection(rep, proj);
+      tmp_end = std::chrono::system_clock::now();       
+      elapsed_time = tmp_end - tmp_start;
+        XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Extend Projection : "
+                                     << elapsed_time.count() << "secs." << flush;
 
       // Print iteration data
       printIterationData(rep, proj, neigen, iiter);
@@ -118,8 +131,12 @@ class DavidsonSolver {
         storeNotConvergedData(rep, proj.root_converged, neigen);
         break;
       }
-
+      tmp_start = std::chrono::system_clock::now();
       proj.V = orthogonalize(proj.V, nupdate);
+      tmp_end = std::chrono::system_clock::now();       
+      elapsed_time = tmp_end - tmp_start;
+        XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Orthogonalization : "
+                                     << elapsed_time.count() << "secs." << flush;
     }
 
     printTiming(start);
@@ -139,7 +156,7 @@ class DavidsonSolver {
   enum UPDATE { MIN, SAFE, MAX };
   UPDATE _davidson_update = UPDATE::SAFE;
 
-  enum ORTHO { GS, QR };
+  enum ORTHO { GS, QR, SVD };
   ORTHO _davidson_ortho = ORTHO::GS;
 
   enum MATRIX_TYPE { SYMM, HAM };
@@ -171,7 +188,7 @@ class DavidsonSolver {
   void updateProjection(const MatrixReplacement &A, ProjectedSpace &proj,
                         int iiter) const {
 
-    if (iiter == 0 || _davidson_ortho == ORTHO::QR) {
+    if (iiter == 0 || _davidson_ortho == ORTHO::QR || _davidson_ortho == ORTHO::SVD) {
       /* if we use QR we ned to recompute the entire projection
       since QR will modify original subspace*/
       proj.AV = A * proj.V;
@@ -207,13 +224,28 @@ class DavidsonSolver {
      * https://cpb-us-w2.wpmucdn.com/sites.baylor.edu/dist/e/71/files/2015/05/InterEvals-1vgdz91.pdf
      */
 
+    std::chrono::time_point<std::chrono::system_clock> start,end;
+    std::chrono::duration<double> elapsed_time;
+
+    start = std::chrono::system_clock::now();
     RitzEigenPair rep;
     Eigen::MatrixXd B = A * proj.AV;
     B = proj.V.transpose() * B;
+    end = std::chrono::system_clock::now();
+    elapsed_time = end - start;
+    XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Get B matrix : "
+                                 << elapsed_time.count() << "secs." << flush;
 
     bool return_eigenvector = true;
+    start = std::chrono::system_clock::now();
     Eigen::GeneralizedEigenSolver<Eigen::MatrixXd> ges(proj.T, B,
                                                        return_eigenvector);
+    end = std::chrono::system_clock::now();
+    elapsed_time = end - start;
+    XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Solve system : "
+                                 << elapsed_time.count() << "secs." << flush;
+
+    start = std::chrono::system_clock::now();
     rep.lambda = ges.eigenvalues().real();
     rep.U = ges.eigenvectors().real();
 
@@ -227,6 +259,12 @@ class DavidsonSolver {
     rep.q = proj.V * rep.U;  // Ritz vectors
     rep.res = proj.AV * rep.U - rep.q * rep.lambda.asDiagonal();  // residues
     rep.res_norm = rep.res.colwise().norm();  // reisdues norms
+
+    end = std::chrono::system_clock::now();
+    elapsed_time = end - start;
+    XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " __ Arrange pairs: "
+                                 << elapsed_time.count() << "secs." << flush;
+
 
     return rep;
   }
@@ -254,7 +292,10 @@ class DavidsonSolver {
 
   Eigen::MatrixXd orthogonalize(const Eigen::MatrixXd &V, int nupdate);
   Eigen::MatrixXd qr(const Eigen::MatrixXd &A) const;
+  Eigen::MatrixXd svd(const Eigen::MatrixXd &A) const;
   Eigen::MatrixXd gramschmidt(const Eigen::MatrixXd &A, int nstart);
+  
+  Eigen::MatrixXd gramschmidt_twice(const Eigen::MatrixXd &A, int nstart);
 
   Eigen::VectorXd computeCorrectionVector(const Eigen::VectorXd &qj,
                                           double lambdaj,

@@ -221,7 +221,7 @@ void GWBSE::Initialize(tools::Property& options) {
       options.ifExistsAndinListReturnElseThrowRuntimeError<std::string>(
           key + ".eigensolver.davidson_correction", _dcorr);
 
-      std::vector<std::string> _dortho = {"GS", "QR"};
+      std::vector<std::string> _dortho = {"GS", "QR","SVD"};
       options.ifExistsAndinListReturnElseThrowRuntimeError<std::string>(
           key + ".eigensolver.davidson_ortho", _dortho);
 
