@@ -346,8 +346,8 @@ Eigen::RowVectorXd HermitianBlockOperator::OperatorRow(int index) const {
 
 BOOST_AUTO_TEST_CASE(davidson_hamiltonian_matrix_free) {
 
-  int size = 60;
-  int neigen = 5;
+  int size = 1000;
+  int neigen = 25;
   Logger log;
 
   // Create Operator

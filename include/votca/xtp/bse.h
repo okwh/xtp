@@ -118,6 +118,14 @@ class BSE {
   tools::EigenSystem Solve_nonhermitian_Davidson(BSE_OPERATOR_A& Aop,
                                                  BSE_OPERATOR_B& Bop) const;
 
+  template <typename BSE_OPERATOR_A, typename BSE_OPERATOR_B>
+  tools::EigenSystem Solve_nonhermitian_full(BSE_OPERATOR_A& Aop,
+                                             BSE_OPERATOR_B& Bop) const;
+
+  Eigen::MatrixXd extract_eigenvectors(const Eigen::MatrixXd &V,
+                                            const Eigen::ArrayXi &idx) const;
+  Eigen::ArrayXi GetIndexInternalEigenpairs(const Eigen::VectorXd &ev, int nev) const;
+
   void printFragInfo(const std::vector<QMFragment<BSE_Population> >& frags,
                      int state) const;
   void printWeights(int i_bse, double weight) const;

@@ -213,13 +213,22 @@ tools::EigenSystem BSE::Solve_singlets_BTDA() const {
         << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
     return Solve_nonhermitian_Davidson(A, B);
   } else {
-    SingletOperator_BTDA_ApB Hs_ApB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Hs_ApB);
-    Operator_BTDA_AmB Hs_AmB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Hs_AmB);
+    // SingletOperator_BTDA_ApB Hs_ApB(_epsilon_0_inv, _Mmn, _Hqp);
+    // configureBSEOperator(Hs_ApB);
+    // Operator_BTDA_AmB Hs_AmB(_epsilon_0_inv, _Mmn, _Hqp);
+    // configureBSEOperator(Hs_AmB);
+    // XTP_LOG_SAVE(logDEBUG, _log)
+    //     << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
+
+    SingletOperator_TDA A(_epsilon_0_inv, _Mmn, _Hqp);
+    configureBSEOperator(A);
+
+    SingletOperator_BTDA_B B(_epsilon_0_inv, _Mmn, _Hqp);
+    configureBSEOperator(B);
+
     XTP_LOG_SAVE(logDEBUG, _log)
         << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
-    return Solve_nonhermitian(Hs_ApB, Hs_AmB);
+    return Solve_nonhermitian_full(A, B);
   }
 }
 
@@ -233,13 +242,19 @@ tools::EigenSystem BSE::Solve_triplets_BTDA() const {
         << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
     return Solve_nonhermitian_Davidson(A, B);
   } else {
-    TripletOperator_BTDA_ApB Ht_ApB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Ht_ApB);
-    Operator_BTDA_AmB Ht_AmB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Ht_AmB);
+    // TripletOperator_BTDA_ApB Ht_ApB(_epsilon_0_inv, _Mmn, _Hqp);
+    // configureBSEOperator(Ht_ApB);
+    // Operator_BTDA_AmB Ht_AmB(_epsilon_0_inv, _Mmn, _Hqp);
+    // configureBSEOperator(Ht_AmB);
+    // XTP_LOG_SAVE(logDEBUG, _log)
+    //     << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
+    TripletOperator_TDA A(_epsilon_0_inv, _Mmn, _Hqp);
+    configureBSEOperator(A);
+    Hd2Operator B(_epsilon_0_inv, _Mmn, _Hqp);
+    configureBSEOperator(B);
     XTP_LOG_SAVE(logDEBUG, _log)
         << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
-    return Solve_nonhermitian(Ht_ApB, Ht_AmB);
+    return Solve_nonhermitian_full(A, B);
   }
 }
 
@@ -352,6 +367,94 @@ tools::EigenSystem BSE::Solve_nonhermitian(BSE_OPERATOR_ApB& apb,
                                << elapsed_time.count() << " secs" << flush;
 
   return result;
+}
+
+template <typename BSE_OPERATOR_A, typename BSE_OPERATOR_B>
+tools::EigenSystem BSE::Solve_nonhermitian_full(BSE_OPERATOR_A& Aop,
+                                                BSE_OPERATOR_B& Bop) const {
+
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::time_point<std::chrono::system_clock> hstart, hend;
+  std::chrono::duration<double> elapsed_time;
+  start = std::chrono::system_clock::now();
+
+  // final container
+  tools::EigenSystem result;
+
+  // operator
+  HamiltonianOperator<BSE_OPERATOR_A, BSE_OPERATOR_B> Hop(Aop, Bop);
+
+
+
+  hstart = std::chrono::system_clock::now();
+  Eigen::MatrixXd H = Hop.get_full_matrix();
+  hend = std::chrono::system_clock::now();
+  elapsed_time = hend - hstart;
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " Full matrix assembled in "
+                             << elapsed_time.count() << " secs" << flush;
+  
+  hstart = std::chrono::system_clock::now();
+  Eigen::EigenSolver<Eigen::MatrixXd> es(H);
+  hend = std::chrono::system_clock::now();
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " Lapack solve done in "
+                             << elapsed_time.count() << " secs" << flush;
+
+  
+  
+  Eigen::ArrayXi idx = GetIndexInternalEigenpairs(es.eigenvalues().real(),_opt.nmax);
+  result.eigenvalues() = idx.unaryExpr(es.eigenvalues().real());
+
+  Eigen::MatrixXd evect = extract_eigenvectors(es.eigenvectors().real(), idx);
+  Eigen::MatrixXd _tmpX = evect.topRows(Aop.size());
+  Eigen::MatrixXd _tmpY = evect.bottomRows(Aop.size());
+
+  // // normalization so that eigenvector^2 - eigenvector2^2 = 1
+  Eigen::VectorXd normX = _tmpX.colwise().squaredNorm();
+  Eigen::VectorXd normY = _tmpY.colwise().squaredNorm();
+
+  Eigen::ArrayXd sqinvnorm = (normX - normY).array().inverse().cwiseSqrt();
+
+  result.eigenvectors() = _tmpX * sqinvnorm.matrix().asDiagonal();
+  result.eigenvectors2() = _tmpY * sqinvnorm.matrix().asDiagonal();
+
+  end = std::chrono::system_clock::now();
+  elapsed_time = end - start;
+
+  XTP_LOG_SAVE(logDEBUG, _log) << TimeStamp() << " Diagonalization done in "
+                               << elapsed_time.count() << " secs" << flush;
+
+  return result;
+}
+
+Eigen::MatrixXd BSE::extract_eigenvectors(const Eigen::MatrixXd &V,
+                                          const Eigen::ArrayXi &idx) const {
+  Eigen::MatrixXd W = Eigen::MatrixXd::Zero(V.rows(), idx.size());
+  for (int i = 0; i < idx.size(); i++) {
+    W.col(i) = V.col(idx(i));
+  }
+  return W;
+}
+
+Eigen::ArrayXi BSE::GetIndexInternalEigenpairs(const Eigen::VectorXd &ev, int neigen) const {
+
+  int nev = ev.rows();
+  int npos = nev / 2;
+
+  Eigen::ArrayXi idx = Eigen::ArrayXi::Zero(npos);
+  int nstored = 0;
+
+  // get only positives
+  for (int i = 0; i < nev; i++) {
+    if (ev(i) > 0) {
+      idx(nstored) = i;
+      nstored++;
+    }
+  }
+
+  // sort the epos eigenvalues
+  std::sort(idx.data(), idx.data() + idx.size(),
+            [&](int i1, int i2) { return ev[i1] < ev[i2]; });
+  return idx.head(neigen);
 }
 
 template <typename BSE_OPERATOR_A, typename BSE_OPERATOR_B>
