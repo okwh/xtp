@@ -30,8 +30,6 @@ JobApplication::JobApplication() { JobCalculatorfactory::RegisterAll(); }
 void JobApplication::Initialize(void) {
   XtpApplication::Initialize();
 
-  JobCalculatorfactory::RegisterAll();
-
   namespace propt = boost::program_options;
 
   AddProgramOptions()("file,f", propt::value<std::string>(),
@@ -42,6 +40,9 @@ void JobApplication::Initialize(void) {
                       "  number of frames to process");
   AddProgramOptions()("nthreads,t", propt::value<Index>()->default_value(1),
                       "  number of threads to create");
+  AddProgramOptions()("openmpthreads,omp",
+                      propt::value<Index>()->default_value(1),
+                      "  number of openmp threads to create");
   AddProgramOptions()("save,s", propt::value<bool>()->default_value(true),
                       "  whether or not to save changes to state file");
   AddProgramOptions()("restart,r",
@@ -78,6 +79,7 @@ void JobApplication::Run() {
 
   // EVALUATE OPTIONS
   Index nThreads = OptionsMap()["nthreads"].as<Index>();
+  Index ompThreads = OptionsMap()["openmpthreads"].as<Index>();
   Index nframes = OptionsMap()["nframes"].as<Index>();
   Index fframe = OptionsMap()["first-frame"].as<Index>();
   bool save = OptionsMap()["save"].as<bool>();

@@ -34,10 +34,10 @@ class DftGwBse : public QMTool {
 
   ~DftGwBse() override = default;
 
-  std::string Identify() override { return "dftgwbse"; }
+  std::string Identify() final { return "dftgwbse"; }
 
-  void Initialize(tools::Property &options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property &options) final;
+  bool Run() final;
 
  private:
   std::string _guess_file;

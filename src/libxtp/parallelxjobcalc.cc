@@ -106,12 +106,11 @@ void ParallelXJobCalc<JobContainer>::ParseCommonOptions(
   _maverick = (_nThreads == 1) ? true : false;
 
   std::string key = "options." + Identify();
-  _openmp_threads = options.ifExistsReturnElseReturnDefault<Index>(
-      key + ".openmp_threads", _openmp_threads);
-  std::cout << std::endl
-            << "... ... Using " << _openmp_threads << " openmp threads for "
-            << _nThreads << "x" << _openmp_threads << "="
-            << _nThreads * _openmp_threads << " total threads." << std::flush;
+  _openmp_threads std::cout
+      << std::endl
+      << "... ... Using " << _openmp_threads << " openmp threads for "
+      << _nThreads << "x" << _openmp_threads << "="
+      << _nThreads * _openmp_threads << " total threads." << std::flush;
   OPENMP::setMaxThreads(_openmp_threads);
   _jobfile = options.ifExistsReturnElseThrowRuntimeError<std::string>(
       key + ".job_file");

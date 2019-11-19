@@ -33,9 +33,6 @@ using namespace std;
 
 void GenCube::Initialize(tools::Property& options) {
 
-  // update options with the VOTCASHARE defaults
-  UpdateWithDefaults(options, "xtp");
-
   string key = "options." + Identify();
   _orbfile = options.get(key + ".input").as<string>();
   _output_file = options.get(key + ".output").as<string>();
@@ -57,12 +54,6 @@ void GenCube::Initialize(tools::Property& options) {
   if (_mode == "subtract") {
     _infile1 = options.get(key + ".infile1").as<string>();
     _infile2 = options.get(key + ".infile2").as<string>();
-  }
-
-  // get the path to the shared folders with xml files
-  char* votca_share = getenv("VOTCASHARE");
-  if (votca_share == nullptr) {
-    throw std::runtime_error("VOTCASHARE not set, cannot open help files.");
   }
 }
 
@@ -213,8 +204,8 @@ void GenCube::calculateCube() {
   return;
 }
 
-Eigen::VectorXd GenCube::EvaluateBasisAtPosition(const AOBasis& dftbasis,
-                                                 const Eigen::Vector3d& pos) {
+Eigen::VectorXd GenCube::EvaluateBasisAtPosition(
+    const AOBasis& dftbasis, const Eigen::Vector3d& pos) const {
 
   // get value of orbitals at each gridpoint
   Eigen::VectorXd tmat = Eigen::VectorXd::Zero(dftbasis.AOBasisSize());
@@ -429,8 +420,7 @@ void GenCube::subtractCubes() {
       << "Wrote subtracted cube data to " << _output_file << flush;
 }
 
-bool GenCube::Evaluate() {
-  OPENMP::setMaxThreads(_nThreads);
+bool GenCube::Run() {
   _log.setReportLevel(logDEBUG);
   _log.setMultithreading(true);
 

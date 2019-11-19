@@ -16,8 +16,6 @@
  * limitations under the License.
  *
  */
-/// For an earlier history see ctp repo commit
-/// 77795ea591b29e664153f9404c8655ba28dc14e9
 
 #pragma once
 #ifndef VOTCA_XTP_QMTOOL_H
@@ -36,8 +34,20 @@ class QMTool : public tools::Calculator {
   ~QMTool() override = default;
 
   std::string Identify() override = 0;
-  void Initialize(tools::Property &options) override = 0;
-  virtual bool Evaluate() = 0;
+  void Initialize(tools::Property& options) final {
+
+    this->UpdateWithDefaults(options, "xtp");
+    ReadOptions(options);
+  }
+
+  bool Evaluate() final {
+    OPENMP::setMaxThreads(_nThreads);
+    return Run();
+  }
+
+ protected:
+  virtual bool Run() = 0;
+  virtual bool ReadOptions(const tools::property& options) = 0;
 };
 
 }  // namespace xtp

@@ -34,10 +34,10 @@ class Log2Mps : public QMTool {
   Log2Mps() = default;
   ~Log2Mps() override = default;
 
-  std::string Identify() override { return "log2mps"; }
+  std::string Identify() final { return "log2mps"; }
 
-  void Initialize(tools::Property &options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property &options) final;
+  bool Run() final;
 
  private:
   std::string _package;
@@ -46,8 +46,6 @@ class Log2Mps : public QMTool {
 };
 
 void Log2Mps::Initialize(tools::Property &opt) {
-
-  QMPackageFactory::RegisterAll();
 
   std::string key = "options.log2mps";
   _package = opt.get(key + ".package").as<std::string>();
@@ -70,8 +68,8 @@ void Log2Mps::Initialize(tools::Property &opt) {
             << "... ... " << _logfile << " => " << _mpsfile << std::flush;
 }
 
-bool Log2Mps::Evaluate() {
-
+bool Log2Mps::Run() {
+  QMPackageFactory::RegisterAll();
   // Logger (required for QM package, so we can just as well use it)
   Logger log;
   log.setPreface(logINFO, "\n... ...");

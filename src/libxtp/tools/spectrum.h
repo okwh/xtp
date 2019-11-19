@@ -37,18 +37,16 @@ class Spectrum : public QMTool {
 
   ~Spectrum() override = default;
 
-  std::string Identify() override { return "spectrum"; }
+  std::string Identify() final { return "spectrum"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   std::string _orbfile;
   std::string _output_file = "spectrum.dat";
 
   Logger _log;
-
-  void CheckContent(const Orbitals& _orbitals);
 
   double evtonm(double eV);
   double evtoinvcm(double eV);

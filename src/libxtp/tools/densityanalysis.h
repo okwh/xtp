@@ -30,10 +30,10 @@ namespace xtp {
 
 class DensityAnalysis : public QMTool {
  public:
-  std::string Identify() override { return "densityanalysis"; }
+  std::string Identify() final { return "densityanalysis"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   std::string _orbfile;
@@ -48,13 +48,10 @@ void DensityAnalysis::Initialize(tools::Property& options) {
   std::string key = "options." + Identify();
   _orbfile = options.get(key + ".input").as<std::string>();
 
-  std::string gyration_xml =
-      options.get(key + ".gyration_options").as<std::string>();
-  _gyration_options.LoadFromXML(gyration_xml);
+  _gyration_options = options.get(key + ".gyration_options");
 }
 
-bool DensityAnalysis::Evaluate() {
-  OPENMP::setMaxThreads(_nThreads);
+bool DensityAnalysis::Run() {
   _log.setReportLevel(logDEBUG);
   _log.setMultithreading(true);
 

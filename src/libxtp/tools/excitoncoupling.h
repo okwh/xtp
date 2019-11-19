@@ -37,10 +37,10 @@ namespace xtp {
 
 class ExcitonCoupling : public QMTool {
  public:
-  std::string Identify() override { return "excitoncoupling"; }
+  std::string Identify() final { return "excitoncoupling"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   std::string _orbA, _orbB, _orbAB;
@@ -87,8 +87,7 @@ void ExcitonCoupling::Initialize(tools::Property& options) {
   }
 }
 
-bool ExcitonCoupling::Evaluate() {
-  OPENMP::setMaxThreads(_nThreads);
+bool ExcitonCoupling::Run() {
   _log.setReportLevel(logDEBUG);
   _log.setMultithreading(true);
 

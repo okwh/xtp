@@ -89,7 +89,6 @@ Index Neighborlist::DetClassicalPairs(Topology& top) {
 }
 
 bool Neighborlist::EvaluateFrame(Topology& top) {
-  OPENMP::setMaxThreads(_nThreads);
   std::cout << " Using " << OPENMP::getMaxThreads() << " threads" << std::flush;
 
   if (tools::globals::verbose) {

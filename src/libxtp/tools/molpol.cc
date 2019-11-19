@@ -169,8 +169,7 @@ void MolPol::PrintPolarisation(const Eigen::Matrix3d& result) const {
   std::cout << std::endl << diag * conversion << std::flush;
 }
 
-bool MolPol::Evaluate() {
-  OPENMP::setMaxThreads(_nThreads);
+bool MolPol::Run() {
   PolarSegment polar = _input;
 
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es;

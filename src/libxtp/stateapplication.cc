@@ -32,8 +32,6 @@ StateApplication::StateApplication() { Calculatorfactory::RegisterAll(); }
 void StateApplication::Initialize(void) {
   XtpApplication::Initialize();
 
-  Calculatorfactory::RegisterAll();
-
   namespace propt = boost::program_options;
 
   AddProgramOptions()("file,f", propt::value<std::string>(),
@@ -63,6 +61,7 @@ void StateApplication::Run() {
 
   _options.LoadFromXML(_op_vm["options"].as<std::string>());
   Index nThreads = OptionsMap()["nthreads"].as<Index>();
+  OPENMP::setMaxThreads(nThreads);
   Index nframes = OptionsMap()["nframes"].as<Index>();
   Index fframe = OptionsMap()["first-frame"].as<Index>();
   bool save = OptionsMap()["save"].as<bool>();
@@ -111,9 +110,9 @@ void StateApplication::SetCalculator(QMCalculator* calculator) {
   _calculator = std::unique_ptr<QMCalculator>(calculator);
 }
 
-void StateApplication::BeginEvaluate(Index nThreads = 1) {
+void StateApplication::BeginEvaluate(Index) {
   std::cout << "... " << _calculator->Identify() << " ";
-  _calculator->setnThreads(nThreads);
+  _calculator->UpdateWithDefaults(_options, "xtp");
   _calculator->Initialize(_options);
   std::cout << std::endl;
 }

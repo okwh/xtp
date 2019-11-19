@@ -37,10 +37,10 @@ class QMSandbox : public QMTool {
   QMSandbox() = default;
   ~QMSandbox() override = default;
 
-  std::string Identify() override { return "qmsandbox"; }
+  std::string Identify() final { return "qmsandbox"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   std::string _orbfile;
@@ -73,7 +73,7 @@ void QMSandbox::Initialize(tools::Property& options) {
       key + ".quadrupole_split");
 }
 
-bool QMSandbox::Evaluate() { return true; }
+bool QMSandbox::Run() { return true; }
 
 }  // namespace xtp
 }  // namespace votca

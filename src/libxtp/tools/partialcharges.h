@@ -34,10 +34,10 @@ class Partialcharges : public QMTool {
   Partialcharges() = default;
   ~Partialcharges() override = default;
 
-  std::string Identify() override { return "partialcharges"; }
+  std::string Identify() final { return "partialcharges"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   std::string _orbfile;
@@ -57,8 +57,7 @@ void Partialcharges::Initialize(tools::Property& options) {
   _esp_options.LoadFromXML(_esp2multipole_xml);
 }
 
-bool Partialcharges::Evaluate() {
-  OPENMP::setMaxThreads(_nThreads);
+bool Partialcharges::Run() {
   _log.setReportLevel(logDEBUG);
   _log.setMultithreading(true);
 

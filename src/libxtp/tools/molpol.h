@@ -31,14 +31,14 @@ namespace xtp {
 class PolarRegion;
 class MolPol : public QMTool {
  public:
-  MolPol() : _input("", 0){};
+  MolPol() = default;
 
   ~MolPol() override = default;
 
-  std::string Identify() override { return "molpol"; }
+  std::string Identify() final { return "molpol"; }
 
-  void Initialize(tools::Property& options) override;
-  bool Evaluate() override;
+  void Initialize(tools::Property& options) final;
+  bool Run() final;
 
  private:
   void PrintPolarisation(const Eigen::Matrix3d& result) const;
@@ -49,7 +49,7 @@ class MolPol : public QMTool {
   Logger _log;
 
   std::string _mps_output;
-  PolarSegment _input;
+  PolarSegment _input = PolarSegment("", 0);
   Eigen::Matrix3d _polarisation_target;
 
   Eigen::VectorXd _weights;
