@@ -79,15 +79,26 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     Eigen::MatrixXd X = setupInitialEigenvectors(size_initial_guess);
     std::cout << X.transpose() * K * X << std::endl;
     X = KOrthogonalize(X, Eigen::MatrixXd(0, 0), K);
-    std::cout << "after" << std::endl;
-    std::cout << X.transpose() * K * X << std::endl;
 
-    X = KOrthogonalize(X, Eigen::MatrixXd(0, 0), K);
-    std::cout << "after2" << std::endl;
-    std::cout << X.transpose() * K * X << std::endl;
+    double MKnorm = ApproximateNormByPower(M, K);
+
+    double realnorm = (M * K).norm();
+
+    std::cout << MKnorm << " " << realnorm << std::endl;
   }
 
  private:
+  template <typename MatrixReplacement1, typename MatrixReplacement2>
+  double ApproximateNormByPower(const MatrixReplacement1 &M,
+                                const MatrixReplacement2 &K) const {
+
+    Eigen::VectorXd result = Eigen::VectorXd::Ones(M.rows());
+    result.normalize();
+    result = K * result;
+    result = M * result;
+    return result.sum();
+  }
+
   template <typename MatrixReplacement>
   Eigen::MatrixXd KOrthogonalize(const Eigen::MatrixXd &Residues,
                                  const Eigen::MatrixXd &S,
@@ -101,9 +112,18 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       W = TR - S * S.transpose() * K * TR;
     }
     Eigen::MatrixXd WW = W.transpose() * K * W;
-    Eigen::LLT<Eigen::MatrixXd> cholesky(WW);
-    Eigen::MatrixXd L = cholesky.matrixL();
-    return W * L.inverse();
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(WW);
+    Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(es.eigenvalues().size());
+    double etol = 1e-9;
+    for (Index i = 0; i < diagonal.size(); ++i) {
+      if (es.eigenvalues()(i) > etol) {
+        diagonal(i) = 1.0 / std::sqrt(es.eigenvalues()(i));
+      }
+    }
+
+    Eigen::MatrixXd sqrtinv = es.eigenvectors() * diagonal.asDiagonal() *
+                              es.eigenvectors().transpose();
+    return W * sqrtinv;
   }
 
   Eigen::MatrixXd setupInitialEigenvectors(Index size_initial_guess) const;
