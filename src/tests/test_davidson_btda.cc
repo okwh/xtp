@@ -90,6 +90,8 @@ BOOST_AUTO_TEST_CASE(davidson_btda_matrix) {
   DS.set_size_update("max");
   DS.set_iter_max(30);
   DS.solve(ApB, AmB, neigen, 30);
+
+  std::cout << DS.num_iterations();
   auto lambda = DS.eigenvalues().real();
   std::sort(lambda.data(), lambda.data() + lambda.size());
 

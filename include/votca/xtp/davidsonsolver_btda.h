@@ -74,17 +74,16 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       size_initial_guess = 2 * neigen;
     }
 
-    double MKnorm = ApproximateNormByPower(M, K);
-
     // target the lowest diagonal element
     Eigen::MatrixXd X = setupInitialEigenvectors(size_initial_guess);
-    X = KOrthogonalize(X, Eigen::MatrixXd(0, 0), K);
+    Eigen::MatrixXd Xm1 = Sm1(X.transpose() * (K * X));
+    X = X * Xm1;
     Eigen::MatrixXd Y = K * X;
     Eigen::MatrixXd Ym = M * Y;
 
     Eigen::MatrixXd S = X;
     Eigen::MatrixXd KS = Y;
-    Eigen::MatrixXd MKS = YM;
+    Eigen::MatrixXd MKS = Ym;
     Index sdim = size_initial_guess;
     Index nact = neigen;
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
@@ -95,20 +94,23 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       X = S * es.eigenvectors();
       Y = KS * es.eigenvectors();
       Ym = MKS * es.eigenvectors();
-
+      _eigenvalues.resize(es.eigenvalues().size());
+      _eigenvalues = es.eigenvalues().cwiseSqrt();
       nact = 0;
       Eigen::MatrixXd W;
       for (Index j = 0; j < neigen; j++) {
         Eigen::VectorXd r = Ym.col(j) - X.col(j) * es.eigenvalues()(j);
         if (r.norm() > _tol) {
-          r = (_preconditioner.array() - es.eigenvalues()(j))
-                  .cwiseInverse()
-                  .asDiagonal() *
-              r;
-          W.conservativeResize(Eigen::NoChange, W.cols() + 1);
-          W.rightCols<1>() = r;
+          r = -r.array() / (_preconditioner.array() - es.eigenvalues()(j));
+          r.normalize();
+          W.conservativeResize(r.size(), W.cols() + 1);
+          W.col(W.cols() - 1) = r;
           nact++;
         }
+      }
+
+      if (nact == 0) {
+        break;
       }
 
       if (sdim + nact > _max_search_space) {
@@ -117,42 +119,32 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
         MKS = Ym;
         sdim = neigen;
       }
-
-      W = W - S * KS.transpose() * W;
+      W = W - S * (KS.transpose() * W);
       Eigen::MatrixXd Wk = K * W;
       Eigen::MatrixXd Wmk = M * Wk;
 
       Eigen::MatrixXd R = Sm1(W.transpose() * Wk);
+
       W = W * R;
       Wk = Wk * R;
       Wmk = Wmk * R;
-      sdim += nact;
       S.conservativeResize(Eigen::NoChange, S.cols() + W.cols());
-      S.leftCols(W.cols()) = W;
+      S.rightCols(W.cols()) = W;
       KS.conservativeResize(Eigen::NoChange, KS.cols() + Wk.cols());
-      KS.leftCols(Wk.cols()) = Wk;
+      KS.rightCols(Wk.cols()) = Wk;
       MKS.conservativeResize(Eigen::NoChange, MKS.cols() + Wmk.cols());
-      MKS.leftCols(Wmk.cols()) = Wmk;
+      MKS.rightCols(Wmk.cols()) = Wmk;
     }
 
-    _eigenvectors = X;
-    _eigenvectors2 = Y * (_eigenvalues.cwiseInverse().asDiagonal());
+    _eigenvectors = X.leftCols(neigen);
+    _eigenvalues.conservativeResize(neigen);
+    _eigenvectors2 =
+        Y.leftCols(neigen) * (_eigenvalues.cwiseInverse().asDiagonal());
   }
 
   Eigen::MatrixXd eigenvectors2() const { return this->_eigenvectors2; }
 
  private:
-  template <typename MatrixReplacement1, typename MatrixReplacement2>
-  double ApproximateNormByPower(const MatrixReplacement1 &M,
-                                const MatrixReplacement2 &K) const {
-
-    Eigen::VectorXd result = Eigen::VectorXd::Ones(M.rows());
-    result.normalize();
-    result = K * result;
-    result = M * result;
-    return result.sum();
-  }
-
   Eigen::MatrixXd Sm1(const Eigen::MatrixXd &m) {
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(m);
     Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(es.eigenvalues().size());
@@ -166,35 +158,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       }
     }
     return es.eigenvectors() * diagonal.asDiagonal() *
-           es.eigenvectors().transpose();
-  }
-
-  template <typename MatrixReplacement>
-  Eigen::MatrixXd KOrthogonalize(const Eigen::MatrixXd &TR,
-                                 const Eigen::MatrixXd &S,
-                                 const MatrixReplacement &K) const {
-
-    Eigen::MatrixXd W;
-    if (S.size() == 0) {
-      W = TR;
-    } else {
-      W = TR - S * S.transpose() * K * TR;
-    }
-    Eigen::MatrixXd WW = W.transpose() * K * W;
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(WW);
-    Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(es.eigenvalues().size());
-    double etol = 1e-7;
-    Index removedfunctions = 0;
-    for (Index i = 0; i < diagonal.size(); ++i) {
-      if (es.eigenvalues()(i) > etol) {
-        diagonal(i) = 1.0 / std::sqrt(es.eigenvalues()(i));
-      } else {
-        removedfunctions++;
-      }
-    }
-    Eigen::MatrixXd sqrtinv = es.eigenvectors() * diagonal.asDiagonal() *
-                              es.eigenvectors().transpose();
-    return (W * sqrtinv).rightCols(W.cols() - removedfunctions);
+           es.eigenvectors().transpose().rightCols(es.eigenvalues().size() -
+                                                   removedfunctions);
   }
 
   Eigen::MatrixXd setupInitialEigenvectors(Index size_initial_guess) const;
