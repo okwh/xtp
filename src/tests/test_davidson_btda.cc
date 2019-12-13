@@ -88,32 +88,22 @@ BOOST_AUTO_TEST_CASE(davidson_btda_matrix) {
   DavidsonSolver_BTDA DS(log);
   DS.set_tolerance("normal");
   DS.set_size_update("max");
-  DS.solve(ApB, AmB, neigen);
+  DS.set_iter_max(30);
+  DS.solve(ApB, AmB, neigen, 30);
   auto lambda = DS.eigenvalues().real();
   std::sort(lambda.data(), lambda.data() + lambda.size());
 
   Eigen::EigenSolver<Eigen::MatrixXd> es(large);
   Eigen::ArrayXi idx = index_eval(es.eigenvalues().real(), neigen);
   Eigen::VectorXd lambda_ref = idx.unaryExpr(es.eigenvalues().real());
-
   bool check_eigenvalues = lambda.isApprox(lambda_ref.head(neigen), 1E-6);
   if (!check_eigenvalues) {
-    std::cout << "Davidson not converged after " << DS.num_iterations()
-              << " iterations" << std::endl;
     std::cout << "Reference eigenvalues" << std::endl;
     std::cout << lambda_ref.head(neigen) << std::endl;
     std::cout << "Davidson eigenvalues" << std::endl;
     std::cout << lambda << std::endl;
   }
   BOOST_CHECK_EQUAL(check_eigenvalues, 1);
-
-  Eigen::MatrixXd evect_dav = DS.eigenvectors().real();
-  Eigen::MatrixXd evect = es.eigenvectors().real();
-  Eigen::MatrixXd evect_ref = extract_eigenvectors(evect, idx);
-
-  bool check_eigenvectors =
-      evect_ref.cwiseAbs2().isApprox(evect_dav.cwiseAbs2(), 0.001);
-  BOOST_CHECK_EQUAL(check_eigenvectors, 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
