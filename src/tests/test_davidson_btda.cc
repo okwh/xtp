@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(davidson_btda_matrix) {
   DS.solve(ApB, AmB, neigen, 30);
 
   std::cout << DS.num_iterations();
-  auto lambda = DS.eigenvalues().real();
+  auto lambda = DS.eigenvalues();
   std::sort(lambda.data(), lambda.data() + lambda.size());
 
   Eigen::EigenSolver<Eigen::MatrixXd> es(large);

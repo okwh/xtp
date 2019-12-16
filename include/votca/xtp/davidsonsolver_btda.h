@@ -84,62 +84,84 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     Eigen::MatrixXd S = X;
     Eigen::MatrixXd KS = Y;
     Eigen::MatrixXd MKS = Ym;
-    Index sdim = size_initial_guess;
-    Index nact = neigen;
+
+    Eigen::VectorXd e = Eigen::VectorXd::Ones(K.rows());
+    e.normalize();
+    double MK_norm = (M * (K * e)).sum();
+    std::cout << "MNorm:" << MK_norm << std::endl;
+    std::cout << "Search space:" << _max_search_space
+              << " initial guess:" << size_initial_guess << " neigen:" << neigen
+              << std::endl;
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
       Eigen::MatrixXd mat = (KS).transpose() * MKS;
-
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(mat);
-      X = S * es.eigenvectors();
-      Y = KS * es.eigenvectors();
-      Ym = MKS * es.eigenvectors();
+      X = S * es.eigenvectors().leftCols(neigen);
+      Y = KS * es.eigenvectors().leftCols(neigen);
+      Ym = MKS * es.eigenvectors().leftCols(neigen);
       _eigenvalues.resize(es.eigenvalues().size());
       _eigenvalues = es.eigenvalues().cwiseSqrt();
-      nact = 0;
+      Index nact = 0;
       Eigen::MatrixXd W;
       for (Index j = 0; j < neigen; j++) {
         Eigen::VectorXd r = Ym.col(j) - X.col(j) * es.eigenvalues()(j);
-        if (r.norm() > _tol) {
+        if (r.norm() > _tol * (MK_norm + es.eigenvalues()(j))) {
           r = -r.array() / (_preconditioner.array() - es.eigenvalues()(j));
-          r.normalize();
           W.conservativeResize(r.size(), W.cols() + 1);
           W.col(W.cols() - 1) = r;
           nact++;
         }
       }
-
+      std::cout << "not converged:" << nact << " of " << neigen << std::endl;
       if (nact == 0) {
         break;
       }
 
-      if (sdim + nact > _max_search_space) {
+      if (S.cols() + nact > _max_search_space) {
         S = X;
         KS = Y;
         MKS = Ym;
-        sdim = neigen;
       }
+
       W = W - S * (KS.transpose() * W);
+      W.colwise().normalize();
+      W = W - S * (KS.transpose() * W);
+      // twice is enough Gram Schmidt
       Eigen::MatrixXd Wk = K * W;
       Eigen::MatrixXd Wmk = M * Wk;
 
-      Eigen::MatrixXd R = Sm1(W.transpose() * Wk);
-
+      Eigen::MatrixXd overlap = W.transpose() * Wk;
+      Eigen::MatrixXd R = Sm1(overlap);
       W = W * R;
       Wk = Wk * R;
       Wmk = Wmk * R;
+
       S.conservativeResize(Eigen::NoChange, S.cols() + W.cols());
       S.rightCols(W.cols()) = W;
       KS.conservativeResize(Eigen::NoChange, KS.cols() + Wk.cols());
       KS.rightCols(Wk.cols()) = Wk;
+      std::cout << S.transpose() * KS << std::endl;
       MKS.conservativeResize(Eigen::NoChange, MKS.cols() + Wmk.cols());
       MKS.rightCols(Wmk.cols()) = Wmk;
     }
 
-    _eigenvectors = X.leftCols(neigen);
     _eigenvalues.conservativeResize(neigen);
-    _eigenvectors2 =
-        Y.leftCols(neigen) * (_eigenvalues.cwiseInverse().asDiagonal());
+    std::cout << "X.transpose()*K*X" << std::endl;
+    std::cout << X.transpose() * K * X << std::endl;
+    Y *= (_eigenvalues.cwiseInverse().asDiagonal());
+    std::cout << "Y.transpose()*M*Y" << std::endl;
+    std::cout << Y.transpose() * M * Y << std::endl;
+    _eigenvectors = (X + Y) / std::sqrt(2);
+    _eigenvectors2 = (Y - X) / std::sqrt(2);
+    std::cout << _eigenvalues << std::endl;
+    std::cout << "overlap" << std::endl;
+    std::cout << _eigenvectors.transpose() * _eigenvectors -
+                     _eigenvectors2.transpose() * _eigenvectors2
+              << std::endl;
+    std::cout << "overlap2" << std::endl;
+    std::cout << _eigenvectors.transpose() * _eigenvectors2 -
+                     _eigenvectors2.transpose() * _eigenvectors
+              << std::endl;
   }
 
   Eigen::MatrixXd eigenvectors2() const { return this->_eigenvectors2; }
