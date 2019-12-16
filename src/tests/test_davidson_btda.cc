@@ -86,12 +86,11 @@ BOOST_AUTO_TEST_CASE(davidson_btda_matrix) {
   large.bottomRightCorner(size, size) = -rmat;
   large.bottomLeftCorner(size, size) = -cmat;
   DavidsonSolver_BTDA DS(log);
-  DS.set_tolerance("normal");
+  DS.set_tolerance("strict");
   DS.set_size_update("max");
   DS.set_iter_max(30);
   DS.solve(ApB, AmB, neigen, 30);
 
-  std::cout << DS.num_iterations();
   auto lambda = DS.eigenvalues();
   std::sort(lambda.data(), lambda.data() + lambda.size());
 

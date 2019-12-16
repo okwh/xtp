@@ -24,6 +24,7 @@
 #include <votca/xtp/bse_operator.h>
 #include <votca/xtp/bseoperator_btda.h>
 #include <votca/xtp/davidsonsolver.h>
+#include <votca/xtp/davidsonsolver_btda.h>
 #include <votca/xtp/populationanalysis.h>
 #include <votca/xtp/qmfragment.h>
 #include <votca/xtp/rpa.h>
@@ -160,7 +161,7 @@ tools::EigenSystem BSE::solve_hermitian(BSE_OPERATOR& h) const {
       XTP_LOG(Log::info, _log) << TimeStamp() << " Full matrix assembled in "
                                << elapsed_time.count() << " secs" << flush;
 
-      // solve theeigenalue problem
+      // solve the eigenalue problem
       hstart = std::chrono::system_clock::now();
       DS.solve(hfull, _opt.nmax);
       hend = std::chrono::system_clock::now();
@@ -201,43 +202,29 @@ tools::EigenSystem BSE::solve_hermitian(BSE_OPERATOR& h) const {
 }
 
 tools::EigenSystem BSE::Solve_singlets_BTDA() const {
+  SingletOperator_BTDA_ApB Hs_ApB(_epsilon_0_inv, _Mmn, _Hqp);
+  configureBSEOperator(Hs_ApB);
+  Operator_BTDA_AmB Hs_AmB(_epsilon_0_inv, _Mmn, _Hqp);
+  configureBSEOperator(Hs_AmB);
+  XTP_LOG(Log::error, _log)
+      << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
   if (_opt.davidson) {
-    SingletOperator_TDA A(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(A);
-
-    SingletOperator_BTDA_B B(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(B);
-
-    XTP_LOG(Log::error, _log)
-        << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
-    return Solve_nonhermitian_Davidson(A, B);
+    return Solve_nonhermitian_Davidson(Hs_ApB, Hs_AmB);
   } else {
-    SingletOperator_BTDA_ApB Hs_ApB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Hs_ApB);
-    Operator_BTDA_AmB Hs_AmB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Hs_AmB);
-    XTP_LOG(Log::error, _log)
-        << TimeStamp() << " Setup Full singlet hamiltonian " << flush;
     return Solve_nonhermitian(Hs_ApB, Hs_AmB);
   }
 }
 
 tools::EigenSystem BSE::Solve_triplets_BTDA() const {
+  TripletOperator_BTDA_ApB Ht_ApB(_epsilon_0_inv, _Mmn, _Hqp);
+  configureBSEOperator(Ht_ApB);
+  Operator_BTDA_AmB Ht_AmB(_epsilon_0_inv, _Mmn, _Hqp);
+  configureBSEOperator(Ht_AmB);
+  XTP_LOG(Log::error, _log)
+      << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
   if (_opt.davidson) {
-    TripletOperator_TDA A(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(A);
-    Hd2Operator B(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(B);
-    XTP_LOG(Log::error, _log)
-        << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
-    return Solve_nonhermitian_Davidson(A, B);
+    return Solve_nonhermitian_Davidson(Ht_ApB, Ht_AmB);
   } else {
-    TripletOperator_BTDA_ApB Ht_ApB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Ht_ApB);
-    Operator_BTDA_AmB Ht_AmB(_epsilon_0_inv, _Mmn, _Hqp);
-    configureBSEOperator(Ht_AmB);
-    XTP_LOG(Log::error, _log)
-        << TimeStamp() << " Setup Full triplet hamiltonian " << flush;
     return Solve_nonhermitian(Ht_ApB, Ht_AmB);
   }
 }
@@ -355,38 +342,33 @@ tools::EigenSystem BSE::Solve_nonhermitian(BSE_OPERATOR_ApB& apb,
 }
 
 template <typename BSE_OPERATOR_A, typename BSE_OPERATOR_B>
-tools::EigenSystem BSE::Solve_nonhermitian_Davidson(BSE_OPERATOR_A& Aop,
-                                                    BSE_OPERATOR_B& Bop) const {
+tools::EigenSystem BSE::Solve_nonhermitian_Davidson(BSE_OPERATOR_A& ApB,
+                                                    BSE_OPERATOR_B& AmB) const {
 
   std::chrono::time_point<std::chrono::system_clock> start, end;
   std::chrono::time_point<std::chrono::system_clock> hstart, hend;
   std::chrono::duration<double> elapsed_time;
   start = std::chrono::system_clock::now();
 
-  // operator
-  HamiltonianOperator<BSE_OPERATOR_A, BSE_OPERATOR_B> Hop(Aop, Bop);
-
   // Davidson solver
-  DavidsonSolver DS(_log);
-  DS.set_correction(_opt.davidson_correction);
+  DavidsonSolver_BTDA DS(_log);
   DS.set_tolerance(_opt.davidson_tolerance);
-  DS.set_ortho(_opt.davidson_ortho);
   DS.set_size_update(_opt.davidson_update);
   DS.set_iter_max(_opt.davidson_maxiter);
   DS.set_max_search_space(10 * _opt.nmax);
-  DS.set_matrix_type("HAM");
 
   if (_opt.matrixfree) {
     XTP_LOG(Log::error, _log)
         << TimeStamp() << " Using matrix free method" << flush;
-    DS.solve(Hop, _opt.nmax);
+    DS.solve(ApB, AmB, _opt.nmax);
 
   } else {
     XTP_LOG(Log::error, _log)
         << TimeStamp() << " Using full matrix method" << flush;
     // get the full matrix
     hstart = std::chrono::system_clock::now();
-    Eigen::MatrixXd hfull = Hop.get_full_matrix();
+    Eigen::MatrixXd ApB_full = ApB.get_full_matrix();
+    Eigen::MatrixXd AmB_full = AmB.get_full_matrix();
     hend = std::chrono::system_clock::now();
 
     elapsed_time = hend - hstart;
@@ -394,30 +376,20 @@ tools::EigenSystem BSE::Solve_nonhermitian_Davidson(BSE_OPERATOR_A& Aop,
     XTP_LOG(Log::info, _log) << TimeStamp() << " Full matrix assembled in "
                              << elapsed_time.count() << " secs" << flush;
 
-    // solve theeigenalue problem
+    // solve the eigenalue problem
     hstart = std::chrono::system_clock::now();
-    DS.solve(hfull, _opt.nmax);
+    DS.solve(ApB_full, AmB_full, _opt.nmax);
     hend = std::chrono::system_clock::now();
 
     elapsed_time = hend - hstart;
     XTP_LOG(Log::info, _log) << TimeStamp() << " Davidson solve done in "
                              << elapsed_time.count() << " secs" << flush;
   }
-
-  // results
   tools::EigenSystem result;
   result.eigenvalues() = DS.eigenvalues();
-  Eigen::MatrixXd _tmpX = DS.eigenvectors().topRows(Aop.size());
-  Eigen::MatrixXd _tmpY = DS.eigenvectors().bottomRows(Aop.size());
-
-  // // normalization so that eigenvector^2 - eigenvector2^2 = 1
-  Eigen::VectorXd normX = _tmpX.colwise().squaredNorm();
-  Eigen::VectorXd normY = _tmpY.colwise().squaredNorm();
-
-  Eigen::ArrayXd sqinvnorm = (normX - normY).array().inverse().cwiseSqrt();
-
-  result.eigenvectors() = _tmpX * sqinvnorm.matrix().asDiagonal();
-  result.eigenvectors2() = _tmpY * sqinvnorm.matrix().asDiagonal();
+  result.eigenvectors() = DS.eigenvectors();
+  result.eigenvectors2() = DS.eigenvectors2();
+  result.info() = DS.info();
 
   end = std::chrono::system_clock::now();
   elapsed_time = end - start;

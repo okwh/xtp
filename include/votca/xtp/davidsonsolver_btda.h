@@ -54,7 +54,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     // in the paper ApB and AmB are referred to as M and K respectively, we will
     // do the same internally
     const MatrixReplacement1 &M = ApB;
-    const MatrixReplacement1 &K = AmB;
+    const MatrixReplacement2 &K = AmB;
 
     // diagonal preconditioner
     _preconditioner = M.diagonal().cwiseProduct(K.diagonal());
@@ -62,8 +62,6 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     if (_max_search_space < neigen) {
       _max_search_space = neigen * 5;
     }
-    std::chrono::time_point<std::chrono::system_clock> start =
-        std::chrono::system_clock::now();
     Index op_size = M.rows();
 
     checkOptions(op_size);
@@ -77,30 +75,24 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     // target the lowest diagonal element
     Eigen::MatrixXd X = setupInitialEigenvectors(size_initial_guess);
     Eigen::MatrixXd Xm1 = Sm1(X.transpose() * (K * X));
-    X = X * Xm1;
+    X *= Xm1;
     Eigen::MatrixXd Y = K * X;
     Eigen::MatrixXd Ym = M * Y;
 
     Eigen::MatrixXd S = X;
     Eigen::MatrixXd KS = Y;
     Eigen::MatrixXd MKS = Ym;
-
-    Eigen::VectorXd e = Eigen::VectorXd::Ones(K.rows());
-    e.normalize();
-    double MK_norm = (M * (K * e)).sum();
-    std::cout << "MNorm:" << MK_norm << std::endl;
-    std::cout << "Search space:" << _max_search_space
-              << " initial guess:" << size_initial_guess << " neigen:" << neigen
-              << std::endl;
+    double MK_norm = ApproxMatrixNorm(M, K);
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
-      Eigen::MatrixXd mat = (KS).transpose() * MKS;
-      Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(mat);
-      X = S * es.eigenvectors().leftCols(neigen);
-      Y = KS * es.eigenvectors().leftCols(neigen);
-      Ym = MKS * es.eigenvectors().leftCols(neigen);
-      _eigenvalues.resize(es.eigenvalues().size());
-      _eigenvalues = es.eigenvalues().cwiseSqrt();
+      Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(KS.transpose() * MKS);
+      const auto eigvec = es.eigenvectors().leftCols(neigen);
+      X = S * eigvec;
+      Y = KS * eigvec;
+      Ym = MKS * eigvec;
+      // MKL needs the resize
+      _eigenvalues.resize(neigen);
+      _eigenvalues = es.eigenvalues().head(neigen).cwiseSqrt();
       Index nact = 0;
       Eigen::MatrixXd W;
       for (Index j = 0; j < neigen; j++) {
@@ -112,77 +104,55 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
           nact++;
         }
       }
-      std::cout << "not converged:" << nact << " of " << neigen << std::endl;
+      // converged
       if (nact == 0) {
         break;
       }
 
+      // restart
       if (S.cols() + nact > _max_search_space) {
         S = X;
         KS = Y;
         MKS = Ym;
       }
 
-      W = W - S * (KS.transpose() * W);
-      W.colwise().normalize();
-      W = W - S * (KS.transpose() * W);
       // twice is enough Gram Schmidt
+      W -= S * (KS.transpose() * W);
+      W.colwise().normalize();
+      W -= S * (KS.transpose() * W);
+
       Eigen::MatrixXd Wk = K * W;
       Eigen::MatrixXd Wmk = M * Wk;
 
-      Eigen::MatrixXd overlap = W.transpose() * Wk;
-      Eigen::MatrixXd R = Sm1(overlap);
-      W = W * R;
-      Wk = Wk * R;
-      Wmk = Wmk * R;
-
-      S.conservativeResize(Eigen::NoChange, S.cols() + W.cols());
-      S.rightCols(W.cols()) = W;
-      KS.conservativeResize(Eigen::NoChange, KS.cols() + Wk.cols());
-      KS.rightCols(Wk.cols()) = Wk;
-      std::cout << S.transpose() * KS << std::endl;
-      MKS.conservativeResize(Eigen::NoChange, MKS.cols() + Wmk.cols());
-      MKS.rightCols(Wmk.cols()) = Wmk;
+      Eigen::MatrixXd R = Sm1(W.transpose() * Wk);
+      W *= R;
+      Wk *= R;
+      Wmk *= R;
+      AppendMatrixToMatrix(S, W);
+      AppendMatrixToMatrix(KS, Wk);
+      AppendMatrixToMatrix(MKS, Wmk);
     }
 
     _eigenvalues.conservativeResize(neigen);
-    std::cout << "X.transpose()*K*X" << std::endl;
-    std::cout << X.transpose() * K * X << std::endl;
     Y *= (_eigenvalues.cwiseInverse().asDiagonal());
-    std::cout << "Y.transpose()*M*Y" << std::endl;
-    std::cout << Y.transpose() * M * Y << std::endl;
-    _eigenvectors = (X + Y) / std::sqrt(2);
-    _eigenvectors2 = (Y - X) / std::sqrt(2);
-    std::cout << _eigenvalues << std::endl;
-    std::cout << "overlap" << std::endl;
-    std::cout << _eigenvectors.transpose() * _eigenvectors -
-                     _eigenvectors2.transpose() * _eigenvectors2
-              << std::endl;
-    std::cout << "overlap2" << std::endl;
-    std::cout << _eigenvectors.transpose() * _eigenvectors2 -
-                     _eigenvectors2.transpose() * _eigenvectors
-              << std::endl;
+    _eigenvectors = 0.5 * (X + Y) * _eigenvalues.cwiseSqrt().asDiagonal();
+    _eigenvectors2 = 0.5 * (Y - X) * _eigenvalues.cwiseSqrt().asDiagonal();
   }
 
   Eigen::MatrixXd eigenvectors2() const { return this->_eigenvectors2; }
 
  private:
-  Eigen::MatrixXd Sm1(const Eigen::MatrixXd &m) {
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(m);
-    Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(es.eigenvalues().size());
-    double etol = 1e-7;
-    Index removedfunctions = 0;
-    for (Index i = 0; i < diagonal.size(); ++i) {
-      if (es.eigenvalues()(i) > etol) {
-        diagonal(i) = 1.0 / std::sqrt(es.eigenvalues()(i));
-      } else {
-        removedfunctions++;
-      }
-    }
-    return es.eigenvectors() * diagonal.asDiagonal() *
-           es.eigenvectors().transpose().rightCols(es.eigenvalues().size() -
-                                                   removedfunctions);
+  template <typename MatrixReplacement1, typename MatrixReplacement2>
+  double ApproxMatrixNorm(const MatrixReplacement1 &M,
+                          const MatrixReplacement2 &K) const {
+    Eigen::VectorXd e = Eigen::VectorXd::Ones(K.rows());
+    e.normalize();
+    return (M * (K * e)).sum();
   }
+
+  Eigen::MatrixXd Sm1(const Eigen::MatrixXd &m) const;
+
+  void AppendMatrixToMatrix(Eigen::MatrixXd &A, const Eigen::MatrixXd &B) const;
 
   Eigen::MatrixXd setupInitialEigenvectors(Index size_initial_guess) const;
   ArrayXl argsort(const Eigen::VectorXd &V) const;

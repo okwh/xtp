@@ -76,11 +76,11 @@ void DavidsonSolver_base::printOptions(Index operator_size) const {
 
 void DavidsonSolver_base::set_tolerance(std::string tol) {
   if (tol == "loose") {
-    this->_tol = 1E-3;
-  } else if (tol == "normal") {
     this->_tol = 1E-4;
-  } else if (tol == "strict") {
+  } else if (tol == "normal") {
     this->_tol = 1E-5;
+  } else if (tol == "strict") {
+    this->_tol = 1E-6;
   } else {
     throw std::runtime_error(tol + " is not a valid Davidson tolerance");
   }

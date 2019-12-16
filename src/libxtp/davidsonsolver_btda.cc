@@ -35,10 +35,8 @@ Eigen::MatrixXd DavidsonSolver_BTDA::setupInitialEigenvectors(
   Eigen::MatrixXd guess =
       Eigen::MatrixXd::Zero(_preconditioner.size(), size_initial_guess);
   ArrayXl idx = DavidsonSolver_BTDA::argsort(_preconditioner);
-
-  Index ind0 = _preconditioner.size() / 2;
   for (Index j = 0; j < size_initial_guess; j++) {
-    guess(idx(ind0 + j), j) = 1.0;
+    guess(idx(j), j) = std::sqrt(_preconditioner(idx(j)));
   }
 
   return guess;
@@ -50,6 +48,30 @@ ArrayXl DavidsonSolver_BTDA::argsort(const Eigen::VectorXd &V) const {
   std::sort(idx.data(), idx.data() + idx.size(),
             [&](Index i1, Index i2) { return V[i1] < V[i2]; });
   return idx;
+}
+
+void DavidsonSolver_BTDA::AppendMatrixToMatrix(Eigen::MatrixXd &A,
+                                               const Eigen::MatrixXd &B) const {
+  assert(A.rows() == B.rows() && "Matrices must have same number of rows");
+  A.conservativeResize(Eigen::NoChange, A.cols() + B.cols());
+  A.rightCols(B.cols()) = B;
+}
+
+Eigen::MatrixXd DavidsonSolver_BTDA::Sm1(const Eigen::MatrixXd &m) const {
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(m);
+  Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(es.eigenvalues().size());
+  double etol = 1e-7;
+  Index removedfunctions = 0;
+  for (Index i = 0; i < diagonal.size(); ++i) {
+    if (es.eigenvalues()(i) > etol) {
+      diagonal(i) = 1.0 / std::sqrt(es.eigenvalues()(i));
+    } else {
+      removedfunctions++;
+    }
+  }
+  return es.eigenvectors() * diagonal.asDiagonal() *
+         es.eigenvectors().transpose().rightCols(es.eigenvalues().size() -
+                                                 removedfunctions);
 }
 
 }  // namespace xtp
