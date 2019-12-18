@@ -49,12 +49,10 @@ class DavidsonSolver {
   void set_correction(std::string method);
   void set_ortho(std::string method);
   void set_size_update(std::string method);
-  void set_matrix_type(std::string mt);
 
   Eigen::ComputationInfo info() const { return _info; }
   Eigen::VectorXd eigenvalues() const { return this->_eigenvalues; }
   Eigen::MatrixXd eigenvectors() const { return this->_eigenvectors; }
-  Eigen::MatrixXd residues() const { return this->_res; }
   Index num_iterations() const { return this->_i_iter; }
 
   template <typename MatrixReplacement>
@@ -92,7 +90,7 @@ class DavidsonSolver {
 
       } else {
         updateProjection(A, proj);
-        rep = getGuessVectors(A, proj);
+        rep = getRitz(proj);
         extendProjection(rep, proj);
       }
 
@@ -130,9 +128,6 @@ class DavidsonSolver {
   enum ORTHO { GS, QR };
   ORTHO _davidson_ortho = ORTHO::GS;
 
-  enum MATRIX_TYPE { SYMM, HAM };
-  MATRIX_TYPE _matrix_type = MATRIX_TYPE::SYMM;
-
   Eigen::VectorXd _eigenvalues;
   Eigen::MatrixXd _eigenvectors;
   Eigen::VectorXd _res;
@@ -140,7 +135,7 @@ class DavidsonSolver {
 
   struct RitzEigenPair {
     Eigen::VectorXd lambda;  // eigenvalues
-    Eigen::MatrixXd q;       // Ritz (or harmonic Ritz) eigenvectors
+    Eigen::MatrixXd q;       // Ritz eigenvectors
     Eigen::MatrixXd U;       // eigenvectors of the small subspace
     Eigen::MatrixXd res;     // residues of the pairs
     Eigen::ArrayXd res_norm() const {
@@ -183,54 +178,6 @@ class DavidsonSolver {
       proj.T.bottomLeftCorner(nvec, old_dim) =
           proj.T.topRightCorner(old_dim, nvec).transpose();
     }
-  }
-
-  template <typename MatrixReplacement>
-  RitzEigenPair getGuessVectors(const MatrixReplacement &A,
-                                const ProjectedSpace &proj) const {
-    // get the ritz vectors
-    switch (this->_matrix_type) {
-      case MATRIX_TYPE::SYMM: {
-        return getRitz(proj);
-      }
-      case MATRIX_TYPE::HAM: {
-        return getHarmonicRitz(A, proj);
-      }
-    }
-    return RitzEigenPair();
-  }
-
-  template <typename MatrixReplacement>
-  RitzEigenPair getHarmonicRitz(const MatrixReplacement &A,
-                                const ProjectedSpace &proj) const {
-
-    /* Compute the Harmonic Ritz vector following
-     * Computing Interior Eigenvalues of Large Matrices
-     * Ronald B Morgan
-     * LINEAR ALGEBRA AND ITS APPLICATIONS 154-156:289-309 (1991)
-     * https://cpb-us-w2.wpmucdn.com/sites.baylor.edu/dist/e/71/files/2015/05/InterEvals-1vgdz91.pdf
-     */
-
-    RitzEigenPair rep;
-    Eigen::MatrixXd B = proj.V.transpose() * (A * proj.AV);
-
-    bool return_eigenvectors = true;
-    Eigen::GeneralizedEigenSolver<Eigen::MatrixXd> ges(proj.T, B,
-                                                       return_eigenvectors);
-
-    ArrayXl idx = DavidsonSolver::argsort(ges.eigenvalues().real());
-    // smallest to largest
-    idx = idx.reverse();
-    // we need the largest values, because this is the inverse value, so reverse
-    // list
-
-    rep.U = DavidsonSolver::extract_vectors(ges.eigenvectors().real(), idx);
-    rep.U.colwise().normalize();
-    rep.lambda = (rep.U.transpose() * proj.T * rep.U).diagonal();
-
-    rep.q = proj.V * rep.U;  // Ritz vectors
-    rep.res = proj.AV * rep.U - rep.q * rep.lambda.asDiagonal();  // residues
-    return rep;
   }
 
   RitzEigenPair getRitz(const ProjectedSpace &proj) const;

@@ -67,14 +67,6 @@ void DavidsonSolver::checkOptions(Index operator_size) {
         << " == Warning : If problems appear, try asking for less than "
         << Index(operator_size / 10) << " eigenvalues" << flush;
   }
-
-  if (this->_matrix_type == MATRIX_TYPE::HAM) {
-    this->_davidson_ortho = ORTHO::QR;
-    XTP_LOG(Log::error, _log)
-        << TimeStamp()
-        << " == Warning : Orthogonalization set to QR for non-symmetric matrix"
-        << flush;
-  }
 }
 
 void DavidsonSolver::printOptions(Index operator_size) const {
@@ -128,16 +120,6 @@ void DavidsonSolver::printIterationData(
       << flush;
 }
 
-void DavidsonSolver::set_matrix_type(std::string mt) {
-  if (mt == "HAM") {
-    this->_matrix_type = MATRIX_TYPE::HAM;
-  } else if (mt == "SYMM") {
-    this->_matrix_type = MATRIX_TYPE::SYMM;
-  } else {
-    throw std::runtime_error(mt + " is not a valid Davidson matrix type");
-  }
-}
-
 void DavidsonSolver::set_ortho(std::string method) {
   if (method == "GS") {
     this->_davidson_ortho = ORTHO::GS;
@@ -185,7 +167,7 @@ void DavidsonSolver::set_size_update(std::string update_size) {
   }
 }
 
-long DavidsonSolver::getSizeUpdate(Index neigen) const {
+Index DavidsonSolver::getSizeUpdate(Index neigen) const {
   Index size_update;
   switch (this->_davidson_update) {
     case UPDATE::MIN:
@@ -222,24 +204,10 @@ Eigen::MatrixXd DavidsonSolver::setupInitialEigenvectors(
   Eigen::MatrixXd guess =
       Eigen::MatrixXd::Zero(_Adiag.size(), size_initial_guess);
   ArrayXl idx = DavidsonSolver::argsort(_Adiag);
-
-  switch (this->_matrix_type) {
-    case MATRIX_TYPE::SYMM:
-      /* \brief Initialize the guess eigenvector so that they 'target' the
-       * smallest diagonal elements */
-      for (Index j = 0; j < size_initial_guess; j++) {
-        guess(idx(j), j) = 1.0;
-      }
-      break;
-
-    case MATRIX_TYPE::HAM:
-      /* Initialize the guess eigenvector so that they 'target' the lowest
-       * positive diagonal elements */
-      Index ind0 = _Adiag.size() / 2;
-      for (Index j = 0; j < size_initial_guess; j++) {
-        guess(idx(ind0 + j), j) = 1.0;
-      }
-      break;
+  /* \brief Initialize the guess eigenvector so that they 'target' the
+   * smallest diagonal elements */
+  for (Index j = 0; j < size_initial_guess; j++) {
+    guess(idx(j), j) = 1.0;
   }
   return guess;
 }

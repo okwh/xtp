@@ -51,6 +51,9 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
   void solve(const MatrixReplacement1 &ApB, const MatrixReplacement2 &AmB,
              Index neigen, Index size_initial_guess = 0) {
 
+    std::chrono::time_point<std::chrono::system_clock> start =
+        std::chrono::system_clock::now();
+
     // in the paper ApB and AmB are referred to as M and K respectively, we will
     // do the same internally
     const MatrixReplacement1 &M = ApB;
@@ -83,6 +86,9 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     Eigen::MatrixXd KS = Y;
     Eigen::MatrixXd MKS = Ym;
     double MK_norm = ApproxMatrixNorm(M, K);
+
+    XTP_LOG(Log::error, _log)
+        << TimeStamp() << " iter\tSearch Space\tNorm" << flush;
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(KS.transpose() * MKS);
@@ -95,8 +101,10 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       _eigenvalues = es.eigenvalues().head(neigen).cwiseSqrt();
       Index nact = 0;
       Eigen::MatrixXd W;
+      double rmax = 0.0;
       for (Index j = 0; j < neigen; j++) {
         Eigen::VectorXd r = Ym.col(j) - X.col(j) * es.eigenvalues()(j);
+        rmax = std::max(rmax, r.norm() / (MK_norm + es.eigenvalues()(j)));
         if (r.norm() > _tol * (MK_norm + es.eigenvalues()(j))) {
           r = -r.array() / (_preconditioner.array() - es.eigenvalues()(j));
           W.conservativeResize(r.size(), W.cols() + 1);
@@ -104,9 +112,26 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
           nact++;
         }
       }
+
+      double percent_converged = 100 * double(neigen - nact) / double(neigen);
+      XTP_LOG(Log::error, _log)
+          << TimeStamp()
+          << boost::format(" %1$4d %2$12d \t %3$4.2e \t %4$5.2f%% converged") %
+                 _i_iter % nact % rmax % percent_converged
+          << std::flush;
+
       // converged
       if (nact == 0) {
+        _info = Eigen::ComputationInfo::Success;
         break;
+      }
+
+      if (_i_iter == _iter_max - 1) {
+        XTP_LOG(Log::error, _log)
+            << TimeStamp() << "Diagonalisation did not converge after "
+            << _iter_max
+            << " iterations\n Try increasing the number of iterations"
+            << std::flush;
       }
 
       // restart
@@ -115,7 +140,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
         KS = Y;
         MKS = Ym;
       }
-
+      // orthogoanlize W with respect to S
       // twice is enough Gram Schmidt
       W -= S * (KS.transpose() * W);
       W.colwise().normalize();
@@ -123,11 +148,12 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
 
       Eigen::MatrixXd Wk = K * W;
       Eigen::MatrixXd Wmk = M * Wk;
-
+      // orthogonalize colums of W with respect to each other
       Eigen::MatrixXd R = Sm1(W.transpose() * Wk);
       W *= R;
       Wk *= R;
       Wmk *= R;
+      // increase search space
       AppendMatrixToMatrix(S, W);
       AppendMatrixToMatrix(KS, Wk);
       AppendMatrixToMatrix(MKS, Wmk);
@@ -137,6 +163,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     Y *= (_eigenvalues.cwiseInverse().asDiagonal());
     _eigenvectors = 0.5 * (X + Y) * _eigenvalues.cwiseSqrt().asDiagonal();
     _eigenvectors2 = 0.5 * (Y - X) * _eigenvalues.cwiseSqrt().asDiagonal();
+
+    printTiming(start);
   }
 
   Eigen::MatrixXd eigenvectors2() const { return this->_eigenvectors2; }

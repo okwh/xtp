@@ -22,7 +22,6 @@
 #include <votca/tools/linalg.h>
 #include <votca/xtp/bse.h>
 #include <votca/xtp/bse_operator.h>
-#include <votca/xtp/bseoperator_btda.h>
 #include <votca/xtp/davidsonsolver.h>
 #include <votca/xtp/davidsonsolver_btda.h>
 #include <votca/xtp/populationanalysis.h>
