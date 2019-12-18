@@ -67,8 +67,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     }
     Index op_size = M.rows();
 
-    checkOptions(op_size);
-    printOptions(op_size);
+    checkOptions(2 * op_size);
+    printOptions(2 * op_size);
 
     // initial guess size
     if (size_initial_guess == 0) {
