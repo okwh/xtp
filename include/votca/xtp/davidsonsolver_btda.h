@@ -97,7 +97,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
 
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(KS.transpose() * MKS);
       Index sizeupdate = getSizeUpdate(neigen);
-      if(sizeupdate>S.cols()>{
+      if (sizeupdate > S.cols()) {
         sizeupdate = S.cols();
       }
       const auto eigvec = es.eigenvectors().leftCols(sizeupdate);
