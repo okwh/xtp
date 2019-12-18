@@ -86,7 +86,9 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     Eigen::MatrixXd KS = Y;
     Eigen::MatrixXd MKS = Ym;
     double MK_norm = ApproxMatrixNorm(M, K);
-
+    XTP_LOG(Log::error, _log)
+        << TimeStamp() << "Approximate Matrix norm of (A+B)*(A-B)=" << MK_norm
+        << " Hrt^2" << flush;
     XTP_LOG(Log::error, _log)
         << TimeStamp() << " iter\tSearch Space\tNorm" << flush;
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
@@ -175,7 +177,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
                           const MatrixReplacement2 &K) const {
     Eigen::VectorXd e = Eigen::VectorXd::Ones(K.rows());
     e.normalize();
-    return (M * (K * e)).sum();
+    e = K * e;
+    return (M * e).sum();
   }
 
   Eigen::MatrixXd Sm1(const Eigen::MatrixXd &m) const;
