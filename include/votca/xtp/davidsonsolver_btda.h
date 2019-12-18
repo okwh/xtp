@@ -127,7 +127,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       XTP_LOG(Log::error, _log)
           << TimeStamp()
           << boost::format(" %1$4d %2$12d \t %3$4.2e \t %4$5.2f%% converged") %
-                 _i_iter % nact % rmax % percent_converged
+                 _i_iter % S.cols() % rmax % percent_converged
           << std::flush;
 
       // converged
