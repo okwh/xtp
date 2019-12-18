@@ -76,7 +76,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     }
 
     // target the lowest diagonal element
-    Eigen::MatrixXd X = setupInitialEigenvectors(size_initial_guess);
+    Eigen::MatrixXd X =
+        setupInitialEigenvectors(size_initial_guess + getSizeUpdate(neigen));
     Eigen::MatrixXd Xm1 = Sm1(X.transpose() * (K * X));
     X *= Xm1;
     Eigen::MatrixXd Y = K * X;
@@ -91,10 +92,15 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
         << " Hrt^2" << flush;
     XTP_LOG(Log::error, _log)
         << TimeStamp() << " iter\tSearch Space\tNorm" << flush;
+
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(KS.transpose() * MKS);
-      const auto eigvec = es.eigenvectors().leftCols(neigen);
+      Index sizeupdate = getSizeUpdate(neigen);
+      if(sizeupdate>S.cols()>{
+        sizeupdate = S.cols();
+      }
+      const auto eigvec = es.eigenvectors().leftCols(sizeupdate);
       X = S * eigvec;
       Y = KS * eigvec;
       Ym = MKS * eigvec;
@@ -104,14 +110,16 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       Index nact = 0;
       Eigen::MatrixXd W;
       double rmax = 0.0;
-      for (Index j = 0; j < neigen; j++) {
+      for (Index j = 0; j < sizeupdate; j++) {
         Eigen::VectorXd r = Ym.col(j) - X.col(j) * es.eigenvalues()(j);
         rmax = std::max(rmax, r.norm() / (MK_norm + es.eigenvalues()(j)));
         if (r.norm() > _tol * (MK_norm + es.eigenvalues()(j))) {
           r = -r.array() / (_preconditioner.array() - es.eigenvalues()(j));
           W.conservativeResize(r.size(), W.cols() + 1);
           W.col(W.cols() - 1) = r;
-          nact++;
+          if (j < neigen) {
+            nact++;
+          }
         }
       }
 
@@ -137,7 +145,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       }
 
       // restart
-      if (S.cols() + nact > _max_search_space) {
+      if (S.cols() + sizeupdate > _max_search_space) {
         S = X;
         KS = Y;
         MKS = Ym;
@@ -161,8 +169,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       AppendMatrixToMatrix(MKS, Wmk);
     }
 
-    _eigenvalues.conservativeResize(neigen);
-    Y *= (_eigenvalues.cwiseInverse().asDiagonal());
+    Y = Y.leftCols(neigen) * (_eigenvalues.cwiseInverse().asDiagonal());
+    X.conservativeResize(Eigen::NoChange, neigen);
     _eigenvectors = 0.5 * (X + Y) * _eigenvalues.cwiseSqrt().asDiagonal();
     _eigenvectors2 = 0.5 * (Y - X) * _eigenvalues.cwiseSqrt().asDiagonal();
 
