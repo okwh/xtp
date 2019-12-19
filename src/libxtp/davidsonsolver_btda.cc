@@ -36,7 +36,7 @@ Eigen::MatrixXd DavidsonSolver_BTDA::setupInitialEigenvectors(
       Eigen::MatrixXd::Zero(_preconditioner.size(), size_initial_guess);
   ArrayXl idx = DavidsonSolver_BTDA::argsort(_preconditioner);
   for (Index j = 0; j < size_initial_guess; j++) {
-    guess(idx(j), j) = std::sqrt(_preconditioner(idx(j)));
+    guess(idx(j), j) = 1.0 / std::sqrt(_preconditioner(idx(j)));
   }
 
   return guess;

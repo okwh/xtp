@@ -76,8 +76,8 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     }
 
     // target the lowest diagonal element
-    Eigen::MatrixXd X =
-        setupInitialEigenvectors(size_initial_guess + getSizeUpdate(neigen));
+    Eigen::MatrixXd X = setupInitialEigenvectors(
+        2 * (size_initial_guess + getSizeUpdate(neigen)));
     Eigen::MatrixXd Xm1 = Sm1(X.transpose() * (K * X));
     X *= Xm1;
     Eigen::MatrixXd Y = K * X;
@@ -96,7 +96,7 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(KS.transpose() * MKS);
-      Index sizeupdate = getSizeUpdate(neigen);
+      Index sizeupdate = 2 * getSizeUpdate(neigen);
       if (sizeupdate > S.cols()) {
         sizeupdate = S.cols();
       }
@@ -112,7 +112,9 @@ class DavidsonSolver_BTDA : public DavidsonSolver_base {
       double rmax = 0.0;
       for (Index j = 0; j < sizeupdate; j++) {
         Eigen::VectorXd r = Ym.col(j) - X.col(j) * es.eigenvalues()(j);
-        rmax = std::max(rmax, r.norm() / (MK_norm + es.eigenvalues()(j)));
+        if (j < neigen) {
+          rmax = std::max(rmax, r.norm() / (MK_norm + es.eigenvalues()(j)));
+        }
         if (r.norm() > _tol * (MK_norm + es.eigenvalues()(j))) {
           r = -r.array() / (_preconditioner.array() - es.eigenvalues()(j));
           W.conservativeResize(r.size(), W.cols() + 1);
