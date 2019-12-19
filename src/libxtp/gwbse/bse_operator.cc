@@ -38,16 +38,14 @@ template <Index cqp, Index cx, Index cd, Index cd2>
 Eigen::RowVectorXd BSE_OPERATOR<cqp, cx, cd, cd2>::OperatorRow(
     Index index) const {
   Eigen::RowVectorXd row = Eigen::RowVectorXd::Zero(_bse_size);
-  if (cd != 0 && cd2 != 0) {
-    row += Hdcombined_row(index);
-  } else {
-    if (cd != 0) {
-      row += cd * Hd_row(index);
-    }
-    if (cd2 != 0) {
-      row += cd2 * Hd2_row(index);
-    }
+
+  if (cd != 0) {
+    row += cd * Hd_row(index);
   }
+  if (cd2 != 0) {
+    row += cd2 * Hd2_row(index);
+  }
+
   if (cqp != 0) {
     row += cqp * Hqp_row(index);
   }
@@ -125,29 +123,6 @@ Eigen::RowVectorXd BSE_OPERATOR<cqp, cx, cd, cd2>::Hd2_row(Index index) const {
   Eigen::MatrixXd Mmn1xMmn2T =
       Mmn1.block(cmin, 0, _bse_ctotal, auxsize) * Mmn2T;
   return Eigen::Map<Eigen::RowVectorXd>(Mmn1xMmn2T.data(), Mmn1xMmn2T.size());
-}
-
-template <Index cqp, Index cx, Index cd, Index cd2>
-Eigen::RowVectorXd BSE_OPERATOR<cqp, cx, cd, cd2>::Hdcombined_row(
-    Index index) const {
-
-  Index auxsize = _Mmn.auxsize();
-  vc2index vc = vc2index(0, 0, _bse_ctotal);
-  const Index vmin = _opt.vmin - _opt.rpamin;
-  const Index cmin = _bse_cmin - _opt.rpamin;
-  Index v1 = vc.v(index);
-  Index c1 = vc.c(index);
-
-  const Eigen::MatrixXd Mmn1 =
-      _Mmn[c1 + cmin].block(vmin, 0, _bse_vtotal + _bse_ctotal, auxsize) *
-      _epsilon_0_inv.asDiagonal();
-
-  const Eigen::MatrixXd& Mmn2 = _Mmn[v1 + vmin];
-  Eigen::MatrixXd result = -cd2 * Mmn2.block(cmin, 0, _bse_ctotal, auxsize) *
-                           Mmn1.topRows(_bse_vtotal).transpose();
-  result -= cd * Mmn1.bottomRows(_bse_ctotal) *
-            Mmn2.block(vmin, 0, _bse_vtotal, auxsize).transpose();
-  return Eigen::Map<Eigen::RowVectorXd>(result.data(), result.size());
 }
 
 template class BSE_OPERATOR<1, 2, 1, 0>;
