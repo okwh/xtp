@@ -110,6 +110,9 @@ class BSE {
   template <typename BSE_OPERATOR>
   tools::EigenSystem solve_hermitian(BSE_OPERATOR& H) const;
 
+  template <typename BSE_OPERATOR>
+  Eigen::MatrixXd SolveSmall(const BSE_OPERATOR& H) const;
+
   template <typename BSE_OPERATOR_ApB, typename BSE_OPERATOR_AmB>
   tools::EigenSystem Solve_nonhermitian(BSE_OPERATOR_ApB& apb,
                                         BSE_OPERATOR_AmB&) const;

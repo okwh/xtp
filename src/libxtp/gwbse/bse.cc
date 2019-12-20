@@ -63,6 +63,43 @@ void BSE::SetupDirectInteractionOperator(const Eigen::VectorXd& DFTenergies) {
 }
 
 template <typename BSE_OPERATOR>
+Eigen::MatrixXd BSE::SolveSmall(const BSE_OPERATOR& H) const {
+
+  BSE_OPERATOR H_small = H;
+  BSEOperator_Options opt;
+
+  opt.homo = _opt.homo;
+  opt.cmax = _opt.homo + 100;
+  opt.vmin = _opt.homo - 10;
+  opt.qpmin = _opt.qpmin;
+  opt.rpamin = _opt.rpamin;
+
+  H_small.configure(opt);
+  XTP_LOG(Log::error, _log)
+      << TimeStamp() << " Setting up small eigenvalue problem of size "
+      << H_small.size() << flush;
+  Eigen::MatrixXd H_mat = H_small.get_full_matrix();
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(H_mat);
+  Index size_initial_guess = 2 * _opt.nmax;
+  Eigen::MatrixXd initial_guess = Eigen::MatrixXd(H.size(), size_initial_guess);
+
+  Index ctotal_small = opt.cmax - opt.homo;
+  Index ctotal_large = _opt.cmax - _opt.homo;
+  vc2index vc_small = vc2index(opt.vmin, _opt.homo + 1, ctotal_small);
+  vc2index vc_large = vc2index(_opt.vmin, _opt.homo + 1, ctotal_large);
+
+  for (Index i = 0; i < size_initial_guess; i++) {
+    for (Index j = 0; j < es.eigenvectors().rows(); j++) {
+      Index large_j = vc_large.I(vc_small.v(j), vc_small.c(j));
+      initial_guess(large_j, i) = es.eigenvectors()(j, i);
+    }
+  }
+  XTP_LOG(Log::error, _log) << TimeStamp() << " Created " << size_initial_guess
+                            << " eigenvectors" << flush;
+  return initial_guess;
+}
+
+template <typename BSE_OPERATOR>
 void BSE::configureBSEOperator(BSE_OPERATOR& H) const {
   BSEOperator_Options opt;
   opt.cmax = _opt.cmax;
@@ -145,7 +182,13 @@ tools::EigenSystem BSE::solve_hermitian(BSE_OPERATOR& h) const {
     if (_opt.matrixfree) {
       XTP_LOG(Log::error, _log)
           << TimeStamp() << " Using matrix free method" << flush;
-      DS.solve(h, _opt.nmax);
+
+      if (h.size() > 5000) {
+        Eigen::MatrixXd initial_guess = this->SolveSmall(h);
+        DS.solve(h, _opt.nmax, initial_guess);
+      } else {
+        DS.solve(h, _opt.nmax);
+      }
     } else {
       XTP_LOG(Log::error, _log)
           << TimeStamp() << " Using full matrix method" << flush;

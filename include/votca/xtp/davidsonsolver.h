@@ -51,6 +51,8 @@ class DavidsonSolver {
   void set_size_update(std::string method);
   void set_matrix_type(std::string mt);
 
+  void set_size_initial_guess(Index N) { _size_initial_guess = N; }
+
   Eigen::ComputationInfo info() const { return _info; }
   Eigen::VectorXd eigenvalues() const { return this->_eigenvalues; }
   Eigen::MatrixXd eigenvectors() const { return this->_eigenvectors; }
@@ -59,7 +61,13 @@ class DavidsonSolver {
 
   template <typename MatrixReplacement>
   void solve(const MatrixReplacement &A, Index neigen,
-             Index size_initial_guess = 0) {
+             const Eigen::MatrixXd &Initial_guess = Eigen::MatrixXd::Zero(0,
+                                                                          0)) {
+
+    // initial guess size
+    if (_size_initial_guess == 0) {
+      _size_initial_guess = 2 * neigen;
+    }
 
     if (_max_search_space < neigen) {
       _max_search_space = neigen * 5;
@@ -71,24 +79,23 @@ class DavidsonSolver {
     checkOptions(op_size);
     printOptions(op_size);
 
-    // initial guess size
-    if (size_initial_guess == 0) {
-      size_initial_guess = 2 * neigen;
-    }
-
     // get the diagonal of the operator
     this->_Adiag = A.diagonal();
 
     // target the lowest diagonal element
-    ProjectedSpace proj = initProjectedSpace(neigen, size_initial_guess);
+    ProjectedSpace proj = initProjectedSpace(neigen, _size_initial_guess);
     RitzEigenPair rep;
+    if (Initial_guess.cols() > 0) {
+      proj.V = Initial_guess;
+      _size_initial_guess = Initial_guess.cols();
+    }
 
     for (_i_iter = 0; _i_iter < _iter_max; _i_iter++) {
 
       bool do_restart = (proj.search_space() > _max_search_space);
 
       if (do_restart) {
-        restart(rep, proj, size_initial_guess);
+        restart(rep, proj, _size_initial_guess);
 
       } else {
         updateProjection(A, proj);
@@ -119,6 +126,7 @@ class DavidsonSolver {
   Index _i_iter = 0;
   double _tol = 1E-4;
   Index _max_search_space = 0;
+  Index _size_initial_guess = 0;
   Eigen::VectorXd _Adiag;
 
   enum CORR { DPR, OLSEN };
