@@ -177,7 +177,7 @@ void GW::CalculateGWPerturbation() {
     XTP_LOG(Log::error, _log)
         << TimeStamp() << " Calculated correlation diagonal" << std::flush;
     Eigen::VectorXd rpa_energies_old = _rpa.getRPAInputEnergies();
-    _rpa.UpdateRPAInputEnergies(_dft_energies, frequencies, _opt.qpmin);
+    _rpa.UpdateRPAInputEnergies(_dft_energies, _gwa_energies, _opt.qpmin);
     XTP_LOG(Log::info, _log)
         << TimeStamp() << " GW_Iteration:" << i_gw
         << " Shift[Hrt]:" << CalcHomoLumoShift(_gwa_energies) << std::flush;
