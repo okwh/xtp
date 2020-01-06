@@ -70,7 +70,7 @@ Eigen::MatrixXd BSE::SolveSmall(const BSE_OPERATOR& H) const {
 
   opt.homo = _opt.homo;
   opt.cmax = _opt.homo + 100;
-  opt.vmin = _opt.homo - 10;
+  opt.vmin = _opt.homo - 30;
   opt.qpmin = _opt.qpmin;
   opt.rpamin = _opt.rpamin;
 
@@ -81,19 +81,17 @@ Eigen::MatrixXd BSE::SolveSmall(const BSE_OPERATOR& H) const {
   Eigen::MatrixXd H_mat = H_small.get_full_matrix();
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(H_mat);
   Index size_initial_guess = 2 * _opt.nmax;
-  Eigen::MatrixXd initial_guess = Eigen::MatrixXd(H.size(), size_initial_guess);
+  Eigen::MatrixXd initial_guess = Eigen::MatrixXd::Zero(H.size(), size_initial_guess);
 
   Index ctotal_small = opt.cmax - opt.homo;
   Index ctotal_large = _opt.cmax - _opt.homo;
   vc2index vc_small = vc2index(opt.vmin, _opt.homo + 1, ctotal_small);
   vc2index vc_large = vc2index(_opt.vmin, _opt.homo + 1, ctotal_large);
 
-  for (Index i = 0; i < size_initial_guess; i++) {
     for (Index j = 0; j < es.eigenvectors().rows(); j++) {
       Index large_j = vc_large.I(vc_small.v(j), vc_small.c(j));
-      initial_guess(large_j, i) = es.eigenvectors()(j, i);
+      initial_guess.row(large_j) = es.eigenvectors().row(j).head(size_initial_guess);
     }
-  }
   XTP_LOG(Log::error, _log) << TimeStamp() << " Created " << size_initial_guess
                             << " eigenvectors" << flush;
   return initial_guess;
