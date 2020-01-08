@@ -293,7 +293,17 @@ bool GW::Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
 void GW::CalculateHQP() {
   _rpa.UpdateRPAInputEnergies(_dft_energies, _gwa_energies, _opt.qpmin);
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
-  _Sigma_c = _sigma->CalcCorrelationOffDiag(_gwa_energies);
+  if (_opt.sigma_offdiags == "approx") {
+    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
+                             << "approx" << std::flush;
+    _Sigma_c = _sigma->CalcCorrelationOffDiag(_gwa_energies);
+  } else if (_opt.sigma_offdiags == "exact") {
+    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
+                             << "exact" << std::flush;
+  } else {
+    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
+                             << "empty" << std::flush;
+  }
   _Sigma_c.diagonal() = diag_backup;
 }
 

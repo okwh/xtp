@@ -405,6 +405,11 @@ void GWBSE::Initialize(tools::Property& options) {
         << " QP grid spacing: " << _gwopt.qp_grid_spacing << flush;
   }
 
+  _gwopt.sigma_offdiags = options.ifExistsReturnElseReturnDefault<std::string>(
+      key + ".sigma_offdiags", _gwopt.sigma_offdiags);
+  XTP_LOG(Log::error, *_pLog)
+      << " Sigma off-diags: " << _gwopt.sigma_offdiags << flush;
+
   return;
 }
 
