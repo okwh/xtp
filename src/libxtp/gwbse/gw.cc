@@ -296,18 +296,24 @@ bool GW::Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
 void GW::CalculateHQP() {
   _rpa.UpdateRPAInputEnergies(_dft_energies, _gwa_energies, _opt.qpmin);
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
-  if (_opt.sigma_offdiags == "approx") {
-    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
-                             << "approx" << std::flush;
-    _Sigma_c = _sigma->CalcCorrelationOffDiag(_gwa_energies);
-  } else if (_opt.sigma_offdiags == "exact") {
-    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
-                             << "exact" << std::flush;
-  } else {
-    XTP_LOG(Log::info, _log) << TimeStamp() << " sigma offdiags: "
-                             << "empty" << std::flush;
-  }
+  _Sigma_c = Sigma_CalcOffDiags();
   _Sigma_c.diagonal() = diag_backup;
+}
+
+Eigen::MatrixXd GW::Sigma_CalcOffDiags() const {
+  if (_opt.sigma_offdiags == "approx") {
+    return _sigma->CalcCorrelationOffDiag(_gwa_energies);
+  } else if (_opt.sigma_offdiags == "empty") {
+    return Eigen::MatrixXd::Zero(_qptotal, _qptotal);
+  } else if (_opt.sigma_offdiags == "exact1") {
+    return _sigma->CalcCorrelationOffDiag1(_gwa_energies);
+  } else if (_opt.sigma_offdiags == "exact2") {
+    return _sigma->CalcCorrelationOffDiag2(_gwa_energies);
+  }
+  throw std::runtime_error(
+      (boost::format("Error: Invalid off-diags option: %d.") %
+       _opt.sigma_offdiags)
+          .str());
 }
 
 }  // namespace xtp

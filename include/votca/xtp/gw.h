@@ -104,6 +104,8 @@ class GW {
   Eigen::VectorXd SolveQP_FixedPoint(const Eigen::VectorXd& frequencies) const;
   bool Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
                  double epsilon) const;
+
+  Eigen::MatrixXd Sigma_CalcOffDiags() const;
 };
 }  // namespace xtp
 }  // namespace votca

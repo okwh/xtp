@@ -73,5 +73,35 @@ Eigen::MatrixXd Sigma_base::CalcCorrelationOffDiag(
   return result;
 }
 
+Eigen::MatrixXd Sigma_base::CalcCorrelationOffDiag1(
+    const Eigen::VectorXd& frequencies) const {
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(_qptotal, _qptotal);
+#pragma omp parallel for schedule(dynamic)
+  for (Index gw_level1 = 0; gw_level1 < _qptotal; gw_level1++) {
+    for (Index gw_level2 = gw_level1 + 1; gw_level2 < _qptotal; gw_level2++) {
+      double sigma_c = CalcCorrelationOffDiagElement(gw_level1, gw_level2,
+                                                     frequencies[gw_level1]);
+      result(gw_level2, gw_level1) = sigma_c;
+    }
+  }
+  result = result.selfadjointView<Eigen::Lower>();
+  return result;
+}
+
+Eigen::MatrixXd Sigma_base::CalcCorrelationOffDiag2(
+    const Eigen::VectorXd& frequencies) const {
+  Eigen::MatrixXd result = Eigen::MatrixXd::Zero(_qptotal, _qptotal);
+#pragma omp parallel for schedule(dynamic)
+  for (Index gw_level1 = 0; gw_level1 < _qptotal; gw_level1++) {
+    for (Index gw_level2 = gw_level1 + 1; gw_level2 < _qptotal; gw_level2++) {
+      double sigma_c = CalcCorrelationOffDiagElement(gw_level1, gw_level2,
+                                                     frequencies[gw_level2]);
+      result(gw_level2, gw_level1) = sigma_c;
+    }
+  }
+  result = result.selfadjointView<Eigen::Lower>();
+  return result;
+}
+
 }  // namespace xtp
 }  // namespace votca

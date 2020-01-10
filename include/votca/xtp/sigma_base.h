@@ -56,6 +56,12 @@ class Sigma_base {
   // Calculates correlation off-diagonal
   Eigen::MatrixXd CalcCorrelationOffDiag(
       const Eigen::VectorXd& frequencies) const;
+  // Calculates correlation off-diagonal (lower)
+  Eigen::MatrixXd CalcCorrelationOffDiag1(
+      const Eigen::VectorXd& frequencies) const;
+  // Calculates correlation off-diagonal (upper)
+  Eigen::MatrixXd CalcCorrelationOffDiag2(
+      const Eigen::VectorXd& frequencies) const;
 
   // Sets up the screening parametrisation
   virtual void PrepareScreening() = 0;
@@ -66,6 +72,9 @@ class Sigma_base {
   virtual double CalcCorrelationOffDiagElement(Index gw_level1, Index gw_level2,
                                                double frequency1,
                                                double frequency2) const = 0;
+  // Calculates Sigma_c off-diagonal elements (exact)
+  virtual double CalcCorrelationOffDiagElement(Index gw_level1, Index gw_level2,
+                                               double frequency) const = 0;
 
  protected:
   options _opt;

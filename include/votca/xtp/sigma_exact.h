@@ -43,6 +43,9 @@ class Sigma_Exact : public Sigma_base {
   virtual double CalcCorrelationOffDiagElement(
       Index gw_level1, Index gw_level2, double frequency1,
       double frequency2) const override;
+  // Calculates Sigma_c off-diagonal elements (exact)
+  virtual double CalcCorrelationOffDiagElement(Index gw_level1, Index gw_level2,
+                                               double frequency) const override;
 
  private:
   RPA::rpa_eigensolution _rpa_solution;    // Eigenvalues, eigenvectors from RPA

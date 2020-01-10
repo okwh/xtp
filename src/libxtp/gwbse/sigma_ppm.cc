@@ -97,6 +97,38 @@ double Sigma_PPM::CalcCorrelationOffDiagElement(Index gw_level1,
   return sigma_c;
 }
 
+double Sigma_PPM::CalcCorrelationOffDiagElement(Index gw_level1,
+                                                Index gw_level2,
+                                                double frequency) const {
+  const Index lumo = _opt.homo + 1;
+  const Index levelsum = _Mmn.nsize();   // total number of bands
+  const Index auxsize = _Mmn.auxsize();  // size of the GW basis
+  const Eigen::VectorXd ppm_weight = _ppm.getPpm_weight();
+  const Eigen::VectorXd ppm_freqs = _ppm.getPpm_freq();
+  const Index qpmin_offset = _opt.qpmin - _opt.rpamin;
+  const Eigen::VectorXd RPAEnergies = _rpa.getRPAInputEnergies();
+  double sigma_c = 0;
+  for (Index i_aux = 0; i_aux < auxsize; i_aux++) {
+    // the ppm_weights smaller 1.e-5 are set to zero in rpa.cc
+    // PPM_construct_parameters
+    if (ppm_weight(i_aux) < 1.e-9) {
+      continue;
+    }
+    const double ppm_freq = ppm_freqs(i_aux);
+    const double fac = 0.5 * ppm_weight(i_aux) * ppm_freq;
+    const Eigen::MatrixXd& Mmn1 = _Mmn[gw_level1 + qpmin_offset];
+    const Eigen::MatrixXd& Mmn2 = _Mmn[gw_level2 + qpmin_offset];
+    const Eigen::VectorXd Mmn1xMmn2 =
+        Mmn1.col(i_aux).cwiseProduct(Mmn2.col(i_aux));
+    Eigen::ArrayXd denom = frequency - RPAEnergies.array();
+    denom.segment(0, lumo) += ppm_freq;
+    denom.segment(lumo, levelsum - lumo) -= ppm_freq;
+    Stabilize(denom);
+    sigma_c += fac * (denom.inverse() * Mmn1xMmn2.array()).sum();
+  }
+  return sigma_c;
+}
+
 void Sigma_PPM::Stabilize(Eigen::ArrayXd& denom) const {
   const double fourpi = 4 * boost::math::constants::pi<double>();
   for (Index i = 0; i < denom.size(); ++i) {

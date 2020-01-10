@@ -42,6 +42,9 @@ class Sigma_PPM : public Sigma_base {
   virtual double CalcCorrelationOffDiagElement(
       Index gw_level1, Index gw_level2, double frequency1,
       double frequency2) const override;
+  // Calculates Sigma_c off-diagonal elements (exact)
+  virtual double CalcCorrelationOffDiagElement(Index gw_level1, Index gw_level2,
+                                               double frequency) const override;
 
  private:
   inline void Stabilize(Eigen::ArrayXd& denom) const;

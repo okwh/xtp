@@ -87,6 +87,31 @@ double Sigma_Exact::CalcCorrelationOffDiagElement(Index gw_level1,
   return 2.0 * sigma_c;
 }
 
+double Sigma_Exact::CalcCorrelationOffDiagElement(Index gw_level1,
+                                                  Index gw_level2,
+                                                  double frequency) const {
+  const double eta = _opt.eta;
+  const Index lumo = _opt.homo + 1;
+  const Index n_occ = lumo - _opt.rpamin;
+  const Index n_unocc = _opt.rpamax - _opt.homo;
+  const Index rpasize = _rpa_solution.omega.size();
+  double sigma_c = 0.0;
+  for (Index s = 0; s < rpasize; s++) {
+    const double eigenvalue = _rpa_solution.omega(s);
+    const Eigen::VectorXd& res1 = _residues[gw_level1].col(s);
+    const Eigen::VectorXd& res2 = _residues[gw_level2].col(s);
+    const Eigen::VectorXd res_12 = res1.cwiseProduct(res2);
+    Eigen::ArrayXd temp = -_rpa.getRPAInputEnergies().array() + frequency;
+    temp.segment(0, n_occ) += eigenvalue;
+    temp.segment(n_occ, n_unocc) -= eigenvalue;
+    const Eigen::ArrayXd numer = res_12.array() * temp;
+    const Eigen::ArrayXd denom = temp.abs2() + eta * eta;
+    sigma_c += (numer / denom).sum();
+  }
+  // Multiply with factor 2.0 to sum over both (identical) spin states
+  return 2.0 * sigma_c;
+}
+
 Eigen::MatrixXd Sigma_Exact::CalcResidues(Index gw_level) const {
   const Index lumo = _opt.homo + 1;
   const Index n_occ = lumo - _opt.rpamin;
