@@ -20,6 +20,8 @@
 #include "votca/xtp/rpa.h"
 #include "votca/xtp/sigma_exact.h"
 #include "votca/xtp/sigma_ppm.h"
+#include <fstream>
+#include <iostream>
 #include <votca/xtp/gw.h>
 
 namespace votca {
@@ -298,6 +300,12 @@ void GW::CalculateHQP() {
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
   _Sigma_c = Sigma_CalcOffDiags();
   _Sigma_c.diagonal() = diag_backup;
+  boost::format numFormat("%+1.9f");
+  Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
+  std::ofstream out;
+  out.open("sigma.log");
+  out << numFormat % _Sigma_c.format(matFormat) << std::endl;
+  out.close();
 }
 
 Eigen::MatrixXd GW::Sigma_CalcOffDiags() const {
@@ -311,7 +319,7 @@ Eigen::MatrixXd GW::Sigma_CalcOffDiags() const {
     return _sigma->CalcCorrelationOffDiag2(_gwa_energies);
   }
   throw std::runtime_error(
-      (boost::format("Error: Invalid off-diags option: %d.") %
+      (boost::format("Error: Invalid off-diags option: %s.") %
        _opt.sigma_offdiags)
           .str());
 }
