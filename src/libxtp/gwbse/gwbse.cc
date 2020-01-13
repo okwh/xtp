@@ -633,24 +633,32 @@ bool GWBSE::Evaluate() {
       << TimeStamp() << " Calculated Mmn_beta (3-center-repulsion x orbitals)  "
       << flush;
 
-  Eigen::MatrixXd Hqp;
+  Eigen::MatrixXd vxc = CalculateVXC(dftbasis);
+  GW gw = GW(*_pLog, Mmn, vxc, _orbitals.MOs().eigenvalues());
 
   if (_do_gw) {
-    Eigen::MatrixXd vxc = CalculateVXC(dftbasis);
-    GW gw = GW(*_pLog, Mmn, vxc, _orbitals.MOs().eigenvalues());
     gw.configure(_gwopt);
     gw.CalculateGWPerturbation();
 
     // store perturbative QP energy data in orbitals object (DFT, S_x,S_c, V_xc,
     // E_qp)
     _orbitals.QPpertEnergies() = gw.getGWAResults();
+  }
 
+  Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
+  Do_BSE(Mmn, Hqp);
+  return true;
+}
+
+Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
+
+  if (_do_gw) {
     XTP_LOG(Log::info, *_pLog)
         << TimeStamp() << " Calculating offdiagonal part of Sigma  " << flush;
     gw.CalculateHQP();
     XTP_LOG(Log::error, *_pLog)
         << TimeStamp() << " Calculated offdiagonal part of Sigma  " << flush;
-    Hqp = gw.getHQP();
+    Eigen::MatrixXd Hqp = gw.getHQP();
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es =
         gw.DiagonalizeQPHamiltonian();
@@ -661,6 +669,7 @@ bool GWBSE::Evaluate() {
 
     _orbitals.QPdiag().eigenvectors() = es.eigenvectors();
     _orbitals.QPdiag().eigenvalues() = es.eigenvalues();
+    return Hqp;
   } else {
     if (_orbitals.getGWAmax() != _gwopt.qpmax ||
         _orbitals.getGWAmin() != _gwopt.qpmin ||
@@ -671,9 +680,12 @@ bool GWBSE::Evaluate() {
           ".orb file, rerun your GW calculation");
     }
     const Eigen::MatrixXd& qpcoeff = _orbitals.QPdiag().eigenvectors();
-    Hqp = qpcoeff * _orbitals.QPdiag().eigenvalues().asDiagonal() *
-          qpcoeff.transpose();
+    return qpcoeff * _orbitals.QPdiag().eigenvalues().asDiagonal() *
+           qpcoeff.transpose();
   }
+}
+
+void GWBSE::Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const {
 
   // proceed only if BSE requested
   if (_do_bse_singlets || _do_bse_triplets) {
@@ -696,7 +708,6 @@ bool GWBSE::Evaluate() {
   }
   XTP_LOG(Log::error, *_pLog)
       << TimeStamp() << " GWBSE calculation finished " << flush;
-  return true;
 }
 }  // namespace xtp
 }  // namespace votca

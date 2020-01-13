@@ -86,6 +86,9 @@ class GWBSE {
   std::string _dftbasis_name;
 
   std::vector<QMFragment<BSE_Population> > _fragments;
+
+  Eigen::MatrixXd Do_Diagonalize_QP(GW& gw) const;
+  void Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const;
 };
 }  // namespace xtp
 }  // namespace votca
