@@ -58,7 +58,6 @@ class GW {
     std::string qp_solver = "fixedpoint";
     Index qp_grid_steps = 201;      // Number of grid points
     double qp_grid_spacing = 0.01;  // Spacing of grid points in Ha
-    std::string sigma_offdiags = "approx";
   };
 
   void configure(const options& opt);
@@ -68,7 +67,8 @@ class GW {
   void CalculateGWPerturbation();
 
   // Calculated offdiagonal elements as well
-  void CalculateHQP();
+  void CalculateHQP() { return CalculateHQP("approx"); }
+  void CalculateHQP(std::string sigma_offdiags);
 
   Eigen::MatrixXd getHQP() const;
 
@@ -105,7 +105,7 @@ class GW {
   bool Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
                  double epsilon) const;
 
-  Eigen::MatrixXd Sigma_CalcOffDiags() const;
+  Eigen::MatrixXd Sigma_CalcOffDiags(std::string sigma_offdiags) const;
 };
 }  // namespace xtp
 }  // namespace votca

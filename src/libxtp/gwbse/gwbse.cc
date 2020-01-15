@@ -405,10 +405,10 @@ void GWBSE::Initialize(tools::Property& options) {
         << " QP grid spacing: " << _gwopt.qp_grid_spacing << flush;
   }
 
-  _gwopt.sigma_offdiags = options.ifExistsReturnElseReturnDefault<std::string>(
-      key + ".sigma_offdiags", _gwopt.sigma_offdiags);
+  _sigma_offdiags = options.ifExistsReturnElseReturnDefault<std::string>(
+      key + ".sigma_offdiags", _sigma_offdiags);
   XTP_LOG(Log::error, *_pLog)
-      << " Sigma off-diags: " << _gwopt.sigma_offdiags << flush;
+      << " Sigma off-diags: " << _sigma_offdiags << flush;
 
   return;
 }
@@ -645,8 +645,24 @@ bool GWBSE::Evaluate() {
     _orbitals.QPpertEnergies() = gw.getGWAResults();
   }
 
-  Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
-  Do_BSE(Mmn, Hqp);
+  if (_sigma_offdiags == "all") {
+    _sigma_offdiags = "approx";
+    Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
+    Do_BSE(Mmn, Hqp);
+    _sigma_offdiags = "empty";
+    Hqp = Do_Diagonalize_QP(gw);
+    Do_BSE(Mmn, Hqp);
+    _sigma_offdiags = "exact1";
+    Hqp = Do_Diagonalize_QP(gw);
+    Do_BSE(Mmn, Hqp);
+    _sigma_offdiags = "exact2";
+    Hqp = Do_Diagonalize_QP(gw);
+    Do_BSE(Mmn, Hqp);
+  } else {
+    Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
+    Do_BSE(Mmn, Hqp);
+  }
+
   return true;
 }
 
@@ -655,7 +671,9 @@ Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
   if (_do_gw) {
     XTP_LOG(Log::info, *_pLog)
         << TimeStamp() << " Calculating offdiagonal part of Sigma  " << flush;
-    gw.CalculateHQP();
+    XTP_LOG(Log::info, *_pLog)
+        << TimeStamp() << " Sigma off-diags: " << _sigma_offdiags << flush;
+    gw.CalculateHQP(_sigma_offdiags);
     XTP_LOG(Log::error, *_pLog)
         << TimeStamp() << " Calculated offdiagonal part of Sigma  " << flush;
     Eigen::MatrixXd Hqp = gw.getHQP();

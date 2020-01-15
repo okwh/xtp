@@ -295,32 +295,31 @@ bool GW::Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
   return energies_converged;
 }
 
-void GW::CalculateHQP() {
+void GW::CalculateHQP(std::string sigma_offdiags) {
   _rpa.UpdateRPAInputEnergies(_dft_energies, _gwa_energies, _opt.qpmin);
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
-  _Sigma_c = Sigma_CalcOffDiags();
+  _Sigma_c = Sigma_CalcOffDiags(sigma_offdiags);
   _Sigma_c.diagonal() = diag_backup;
   boost::format numFormat("%+1.9f");
   Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
   std::ofstream out;
-  out.open("sigma.log");
+  out.open((boost::format("sigma_%s.log") % sigma_offdiags).str());
   out << numFormat % _Sigma_c.format(matFormat) << std::endl;
   out.close();
 }
 
-Eigen::MatrixXd GW::Sigma_CalcOffDiags() const {
-  if (_opt.sigma_offdiags == "approx") {
+Eigen::MatrixXd GW::Sigma_CalcOffDiags(std::string sigma_offdiags) const {
+  if (sigma_offdiags == "approx") {
     return _sigma->CalcCorrelationOffDiag(_gwa_energies);
-  } else if (_opt.sigma_offdiags == "empty") {
+  } else if (sigma_offdiags == "empty") {
     return Eigen::MatrixXd::Zero(_qptotal, _qptotal);
-  } else if (_opt.sigma_offdiags == "exact1") {
+  } else if (sigma_offdiags == "exact1") {
     return _sigma->CalcCorrelationOffDiag1(_gwa_energies);
-  } else if (_opt.sigma_offdiags == "exact2") {
+  } else if (sigma_offdiags == "exact2") {
     return _sigma->CalcCorrelationOffDiag2(_gwa_energies);
   }
   throw std::runtime_error(
-      (boost::format("Error: Invalid off-diags option: %s.") %
-       _opt.sigma_offdiags)
+      (boost::format("Error: Invalid off-diags option: %s.") % sigma_offdiags)
           .str());
 }
 
