@@ -302,8 +302,8 @@ void GW::CalculateHQP(std::string sigma_offdiags) {
   _Sigma_c.diagonal() = diag_backup;
   boost::format numFormat("%+1.9f");
   Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
-  std::ofstream out;
-  out.open((boost::format("sigma_%s.log") % sigma_offdiags).str());
+  std::string filename = (boost::format("sigma_%s.log") % sigma_offdiags).str();
+  std::ofstream out(filename, std::ofstream::trunc);
   out << numFormat % _Sigma_c.format(matFormat) << std::endl;
   out.close();
 }
