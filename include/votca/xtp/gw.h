@@ -79,6 +79,8 @@ class GW {
   void PlotSigma(std::string filename, Index steps, double spacing,
                  std::string states) const;
 
+  Eigen::MatrixXd getSigma_c() const { return _Sigma_c; }
+
  private:
   Index _qptotal;
 

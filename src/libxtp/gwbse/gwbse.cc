@@ -702,6 +702,11 @@ Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
         << TimeStamp() << " Calculated offdiagonal part of Sigma  " << flush;
     Eigen::MatrixXd Hqp = gw.getHQP();
 
+    WriteMatrixBinary(gw.getSigma_c(),
+                      (boost::format("sigma_%s.bin") % _sigma_offdiags).str());
+    WriteMatrixBinary(Hqp,
+                      (boost::format("hqp_%s.bin") % _sigma_offdiags).str());
+
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es =
         gw.DiagonalizeQPHamiltonian();
     if (es.info() == Eigen::ComputationInfo::Success) {
@@ -750,6 +755,19 @@ void GWBSE::Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const {
   }
   XTP_LOG(Log::error, *_pLog)
       << TimeStamp() << " GWBSE calculation finished " << flush;
+}
+
+void GWBSE::WriteMatrixBinary(const Eigen::MatrixXd& matrix,
+                              std::string filename) const {
+  std::ofstream out(filename,
+                    std::ios::out | std::ios::binary | std::ios::trunc);
+  Eigen::MatrixXd::Index rows = matrix.rows();
+  Eigen::MatrixXd::Index cols = matrix.cols();
+  out.write((char*)(&rows), sizeof(typename Eigen::MatrixXd::Index));
+  out.write((char*)(&cols), sizeof(typename Eigen::MatrixXd::Index));
+  out.write((char*)matrix.data(),
+            rows * cols * sizeof(typename Eigen::MatrixXd::Scalar));
+  out.close();
 }
 }  // namespace xtp
 }  // namespace votca

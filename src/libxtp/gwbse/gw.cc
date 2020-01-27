@@ -300,12 +300,6 @@ void GW::CalculateHQP(std::string sigma_offdiags) {
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
   _Sigma_c = Sigma_CalcOffDiags(sigma_offdiags);
   _Sigma_c.diagonal() = diag_backup;
-  boost::format numFormat("%+1.9f");
-  Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
-  std::string filename = (boost::format("sigma_%s.log") % sigma_offdiags).str();
-  std::ofstream out(filename, std::ofstream::trunc);
-  out << numFormat % _Sigma_c.format(matFormat) << std::endl;
-  out.close();
 }
 
 Eigen::MatrixXd GW::Sigma_CalcOffDiags(std::string sigma_offdiags) const {
