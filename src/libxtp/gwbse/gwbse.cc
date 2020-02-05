@@ -432,6 +432,23 @@ void GWBSE::Initialize(tools::Property& options) {
   XTP_LOG(Log::error, *_pLog)
       << " Sigma off-diags: " << _sigma_offdiags << flush;
 
+  _gwopt.gw_import = options.ifExistsReturnElseReturnDefault<bool>(
+      key + ".gw_import", _gwopt.gw_import);
+  _gwopt.gw_export = options.ifExistsReturnElseReturnDefault<bool>(
+      key + ".gw_export", _gwopt.gw_export);
+  _gwopt.gw_filename = options.ifExistsReturnElseReturnDefault<std::string>(
+      key + ".gw_filename", _gwopt.gw_filename);
+  if (_gwopt.gw_import && _gwopt.gw_export) {
+    XTP_LOG(Log::error, *_pLog)
+        << " GW filename (import+export): " << _gwopt.gw_filename << flush;
+  } else if (_gwopt.gw_import) {
+    XTP_LOG(Log::error, *_pLog)
+        << " GW filename (import): " << _gwopt.gw_filename << flush;
+  } else if (_gwopt.gw_export) {
+    XTP_LOG(Log::error, *_pLog)
+        << " GW filename (export): " << _gwopt.gw_filename << flush;
+  }
+
   return;
 }
 

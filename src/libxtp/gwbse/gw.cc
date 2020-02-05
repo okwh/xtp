@@ -154,8 +154,10 @@ void GW::CalculateGWPerturbation() {
   Eigen::VectorXd dft_shifted_energies = ScissorShift_DFTlevel(_dft_energies);
   _rpa.setRPAInputEnergies(
       dft_shifted_energies.segment(_opt.rpamin, _opt.rpamax - _opt.rpamin + 1));
-  Eigen::VectorXd frequencies =
-      dft_shifted_energies.segment(_opt.qpmin, _qptotal);
+  Eigen::VectorXd frequencies;
+  if (!_opt.gw_import || !ImportGWEnergies(frequencies)) {
+    frequencies = dft_shifted_energies.segment(_opt.qpmin, _qptotal);
+  }
   for (Index i_gw = 0; i_gw < _opt.gw_sc_max_iterations; ++i_gw) {
 
     if (i_gw % _opt.reset_3c == 0 && i_gw != 0) {
@@ -196,6 +198,9 @@ void GW::CalculateGWPerturbation() {
   }
   _Sigma_c.diagonal() = _sigma->CalcCorrelationDiag(frequencies);
   PrintGWA_Energies();
+  if (_opt.gw_export) {
+    ExportGWEnergies(frequencies);
+  }
 }
 
 Eigen::VectorXd GW::getGWAResults() const {
@@ -428,6 +433,36 @@ void GW::PlotSigma(std::string filename, Index steps, double spacing,
   Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
   out << numFormat % mat.format(matFormat) << std::endl;
   out.close();
+}
+
+bool GW::ImportGWEnergies(Eigen::VectorXd& frequencies) const {
+  std::ifstream in_file;
+  in_file.open(_opt.gw_filename);
+  if (in_file.fail()) {
+    XTP_LOG(Log::error, _log) << TimeStamp() << " GW file " << _opt.gw_filename
+                              << " does not exist " << std::flush;
+    in_file.close();
+    return false;
+  }
+  XTP_LOG(Log::error, _log) << TimeStamp() << " Parsing GW energies from "
+                            << _opt.gw_filename << std::flush;
+  frequencies = Eigen::VectorXd::Zero(_qptotal);
+  for (int i = 0; i < _qptotal; i++) {
+    in_file >> frequencies[i];
+  }
+  in_file.close();
+  return true;
+}
+
+void GW::ExportGWEnergies(const Eigen::VectorXd& frequencies) const {
+  XTP_LOG(Log::error, _log) << TimeStamp() << " Exporting GW energies to "
+                            << _opt.gw_filename << std::flush;
+  std::ofstream out_file;
+  out_file.open(_opt.gw_filename);
+  boost::format numFormat("%+1.6f");
+  Eigen::IOFormat matFormat(Eigen::StreamPrecision, 0, "\t", "\n");
+  out_file << numFormat % frequencies.format(matFormat) << std::endl;
+  out_file.close();
 }
 
 }  // namespace xtp

@@ -59,6 +59,9 @@ class GW {
     double qp_solver_alpha = 0.75;
     Index qp_grid_steps = 601;       // Number of grid points
     double qp_grid_spacing = 0.005;  // Spacing of grid points in Ha
+    bool gw_import = false;
+    bool gw_export = false;
+    std::string gw_filename = "gw_energies.log";
   };
 
   void configure(const options& opt);
@@ -152,6 +155,9 @@ class GW {
                  double epsilon) const;
 
   Eigen::MatrixXd Sigma_CalcOffDiags(std::string sigma_offdiags) const;
+
+  bool ImportGWEnergies(Eigen::VectorXd& frequencies) const;
+  void ExportGWEnergies(const Eigen::VectorXd& frequencies) const;
 };
 }  // namespace xtp
 }  // namespace votca
