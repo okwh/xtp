@@ -55,8 +55,9 @@ class GW {
     std::string sigma_integration = "ppm";
     Index reset_3c = 5;  // how often the 3c integrals in iterate should be
                          // rebuild
-    std::string qp_solver = "grid";
-    double qp_solver_alpha = 0.75;
+    std::string qp_solver = "grid";  // QP Solver
+    double qp_solver_alpha = 0.75;   // QP solver mixing parameter
+    bool qp_solver_fallback = true;  // Call default solver if QP solver fails
     Index qp_grid_steps = 601;       // Number of grid points
     double qp_grid_spacing = 0.005;  // Spacing of grid points in Ha
     bool gw_import = false;
@@ -67,18 +68,17 @@ class GW {
   void configure(const options& opt);
 
   Eigen::VectorXd getGWAResults() const;
+  Eigen::MatrixXd getHQP() const;
+
+  // Diagonalize QP particle Hamiltonian
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> DiagonalizeHQP() const;
+
   // Calculates the diagonal elements up to self consistency
   void CalculateGWPerturbation();
 
   // Calculated offdiagonal elements as well
   void CalculateHQP() { return CalculateHQP("approx"); }
   void CalculateHQP(std::string sigma_offdiags);
-
-  Eigen::MatrixXd getHQP() const;
-
-  // Diagonalize QP particle Hamiltonian
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> DiagonalizeQPHamiltonian()
-      const;
 
   void PlotSigma(std::string filename, Index steps, double spacing,
                  std::string states) const;
@@ -133,26 +133,27 @@ class GW {
     const Sigma_base& _sigma_c_func;
   };
 
-  double SolveQP_Bisection(double lowerbound, double f_lowerbound,
-                           double upperbound, double f_upperbound,
-                           const QPFunc& f) const;
   double CalcHomoLumoShift(Eigen::VectorXd frequencies) const;
   Eigen::VectorXd ScissorShift_DFTlevel(
       const Eigen::VectorXd& dft_energies) const;
-  void PrintQP_Energies(const Eigen::VectorXd& qp_diag_energies) const;
   void PrintGWA_Energies() const;
+  void PrintQP_Energies(const Eigen::VectorXd& qp_diag_energies) const;
 
-  Eigen::VectorXd SolveQP(const Eigen::VectorXd& frequencies) const;
-  boost::optional<double> SolveQP_Grid(double intercept0, double frequency0,
-                                       Index gw_level) const;
-  boost::optional<double> SolveQP_FixedPoint(double intercept0,
-                                             double frequency0,
-                                             Index gw_level) const;
-  boost::optional<double> SolveQP_Linearisation(double intercept0,
-                                                double frequency0,
-                                                Index gw_level) const;
   bool Converged(const Eigen::VectorXd& e1, const Eigen::VectorXd& e2,
                  double epsilon) const;
+
+  Eigen::VectorXd SolveQP(const Eigen::VectorXd& frequencies) const;
+  boost::optional<double> SolveQP_Bisection(double freq_lb, double freq_ub,
+                                            double targ_lb, double targ_ub,
+                                            const QPFunc& fqp) const;
+  boost::optional<double> SolveQP_FixedPoint(double frequency0,
+                                             const QPFunc& fqp) const;
+  boost::optional<double> SolveQP_Grid(double frequency0,
+                                       const QPFunc& fqp) const;
+  boost::optional<double> SolveQP_Linearisation(double frequency0,
+                                                const QPFunc& fqp) const;
+  boost::optional<double> SolveQP_Newton(double frequency0,
+                                         const QPFunc& fqp) const;
 
   Eigen::MatrixXd Sigma_CalcOffDiags(std::string sigma_offdiags) const;
 
