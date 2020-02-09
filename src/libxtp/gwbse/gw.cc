@@ -105,8 +105,8 @@ void GW::PrintGWA_Energies() const {
 
     XTP_LOG(Log::error, _log)
         << level
-        << (boost::format(" = %1$4d DFT = %2$+1.4f VXC = %3$+1.4f S-X = "
-                          "%4$+1.4f S-C = %5$+1.4f GWA = %6$+1.4f") %
+        << (boost::format(" = %1$4d DFT = %2$+1.6f VXC = %3$+1.6f S-X = "
+                          "%4$+1.6f S-C = %5$+1.6f GWA = %6$+1.6f") %
             (i + _opt.qpmin) % _dft_energies(i + _opt.qpmin) % _vxc(i, i) %
             _Sigma_x(i, i) % _Sigma_c(i, i) % gwa_energies(i))
                .str()
@@ -158,20 +158,25 @@ void GW::CalculateGWPerturbation() {
   Eigen::VectorXd dft_shifted_energies = ScissorShift_DFTlevel(_dft_energies);
   _rpa.setRPAInputEnergies(
       dft_shifted_energies.segment(_opt.rpamin, _opt.rpamax - _opt.rpamin + 1));
+  XTP_LOG(Log::info, _log) << TimeStamp() << " Calculating screening via RPA"
+                           << std::flush;
+  _sigma->PrepareScreening();
   Eigen::VectorXd frequencies;
   if (!_opt.gw_import || !ImportGWEnergies(frequencies)) {
     frequencies = dft_shifted_energies.segment(_opt.qpmin, _qptotal);
   }
   for (Index i_gw = 0; i_gw < _opt.gw_sc_max_iterations; ++i_gw) {
-
-    if (i_gw % _opt.reset_3c == 0 && i_gw != 0) {
-      _Mmn.Rebuild();
+    if (i_gw != 0) {
+      if (i_gw % _opt.reset_3c == 0) {
+        XTP_LOG(Log::info, _log)
+            << TimeStamp() << " Rebuilding 3c integrals" << std::flush;
+        _Mmn.Rebuild();
+      }
       XTP_LOG(Log::info, _log)
-          << TimeStamp() << " Rebuilding 3c integrals" << std::flush;
+          << TimeStamp() << " Calculating screening via RPA" << std::flush;
+      _sigma->PrepareScreening();
     }
-    _sigma->PrepareScreening();
-    XTP_LOG(Log::info, _log)
-        << TimeStamp() << " Calculated screening via RPA" << std::flush;
+
     XTP_LOG(Log::info, _log)
         << TimeStamp() << " Solving QP equations " << std::flush;
     frequencies = SolveQP(frequencies);
@@ -200,6 +205,8 @@ void GW::CalculateGWPerturbation() {
       }
     }
   }
+  XTP_LOG(Log::error, _log)
+      << TimeStamp() << " Calculating diagonal part of Sigma  " << std::flush;
   _Sigma_c.diagonal() = _sigma->CalcCorrelationDiag(frequencies);
   PrintGWA_Energies();
   if (_opt.gw_export) {
