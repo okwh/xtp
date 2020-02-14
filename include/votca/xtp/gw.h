@@ -63,6 +63,7 @@ class GW {
     bool gw_import = false;
     bool gw_export = false;
     std::string gw_filename = "gw_energies.log";
+    std::string sigma_offdiags = "approx";
   };
 
   void configure(const options& opt);
@@ -77,8 +78,7 @@ class GW {
   void CalculateGWPerturbation();
 
   // Calculated offdiagonal elements as well
-  void CalculateHQP() { return CalculateHQP("approx"); }
-  void CalculateHQP(std::string sigma_offdiags);
+  void CalculateHQP();
 
   void PlotSigma(std::string filename, Index steps, double spacing,
                  std::string states) const;
@@ -155,7 +155,7 @@ class GW {
   boost::optional<double> SolveQP_Newton(double frequency0,
                                          const QPFunc& fqp) const;
 
-  Eigen::MatrixXd Sigma_CalcOffDiags(std::string sigma_offdiags) const;
+  Eigen::MatrixXd Sigma_CalcOffDiags() const;
 
   bool ImportGWEnergies(Eigen::VectorXd& frequencies) const;
   void ExportGWEnergies(const Eigen::VectorXd& frequencies) const;

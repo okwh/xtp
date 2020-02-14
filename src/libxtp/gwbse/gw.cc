@@ -382,24 +382,25 @@ boost::optional<double> GW::SolveQP_Newton(double frequency0,
   return newf;
 }
 
-void GW::CalculateHQP(std::string sigma_offdiags) {
+void GW::CalculateHQP() {
   Eigen::VectorXd diag_backup = _Sigma_c.diagonal();
-  _Sigma_c = Sigma_CalcOffDiags(sigma_offdiags);
+  _Sigma_c = Sigma_CalcOffDiags();
   _Sigma_c.diagonal() = diag_backup;
 }
 
-Eigen::MatrixXd GW::Sigma_CalcOffDiags(std::string sigma_offdiags) const {
-  if (sigma_offdiags == "approx") {
+Eigen::MatrixXd GW::Sigma_CalcOffDiags() const {
+  if (_opt.sigma_offdiags == "approx") {
     return _sigma->CalcCorrelationOffDiag(getGWAResults());
-  } else if (sigma_offdiags == "empty") {
+  } else if (_opt.sigma_offdiags == "empty") {
     return Eigen::MatrixXd::Zero(_qptotal, _qptotal);
-  } else if (sigma_offdiags == "exact1") {
+  } else if (_opt.sigma_offdiags == "exact1") {
     return _sigma->CalcCorrelationOffDiag1(getGWAResults());
-  } else if (sigma_offdiags == "exact2") {
+  } else if (_opt.sigma_offdiags == "exact2") {
     return _sigma->CalcCorrelationOffDiag2(getGWAResults());
   }
   throw std::runtime_error(
-      (boost::format("Error: Invalid off-diags option: %s.") % sigma_offdiags)
+      (boost::format("Error: Invalid off-diags option: %s.") %
+       _opt.sigma_offdiags)
           .str());
 }
 

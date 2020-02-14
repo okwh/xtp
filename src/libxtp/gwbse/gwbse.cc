@@ -439,10 +439,10 @@ void GWBSE::Initialize(tools::Property& options) {
         << " Sigma plot filename: " << _sigma_plot_filename << flush;
   }
 
-  _sigma_offdiags = options.ifExistsReturnElseReturnDefault<std::string>(
-      key + ".sigma_offdiags", _sigma_offdiags);
+  _gwopt.sigma_offdiags = options.ifExistsReturnElseReturnDefault<std::string>(
+      key + ".sigma_offdiags", _gwopt.sigma_offdiags);
   XTP_LOG(Log::error, *_pLog)
-      << " Sigma off-diags: " << _sigma_offdiags << flush;
+      << " Sigma off-diags: " << _gwopt.sigma_offdiags << flush;
 
   _gwopt.gw_import = options.ifExistsReturnElseReturnDefault<bool>(
       key + ".gw_import", _gwopt.gw_import);
@@ -460,6 +460,11 @@ void GWBSE::Initialize(tools::Property& options) {
     XTP_LOG(Log::error, *_pLog)
         << " GW filename (export): " << _gwopt.gw_filename << flush;
   }
+
+  _export_gw_matrices = options.ifExistsReturnElseReturnDefault<bool>(
+      key + ".export_gw_matrices", _export_gw_matrices);
+  XTP_LOG(Log::error, *_pLog)
+      << " Export GW matrices: " << _export_gw_matrices << flush;
 
   return;
 }
@@ -684,10 +689,11 @@ bool GWBSE::Evaluate() {
       << TimeStamp() << " Calculated Mmn_beta (3-center-repulsion x orbitals)  "
       << flush;
 
-  Eigen::MatrixXd vxc = CalculateVXC(dftbasis);
-  GW gw = GW(*_pLog, Mmn, vxc, _orbitals.MOs().eigenvalues());
+  Eigen::MatrixXd Hqp;
 
   if (_do_gw) {
+    Eigen::MatrixXd vxc = CalculateVXC(dftbasis);
+    GW gw = GW(*_pLog, Mmn, vxc, _orbitals.MOs().eigenvalues());
     gw.configure(_gwopt);
     gw.CalculateGWPerturbation();
 
@@ -699,45 +705,18 @@ bool GWBSE::Evaluate() {
     // store perturbative QP energy data in orbitals object (DFT, S_x,S_c, V_xc,
     // E_qp)
     _orbitals.QPpertEnergies() = gw.getGWAResults();
-  }
 
-  if (_sigma_offdiags == "all") {
-    _sigma_offdiags = "approx";
-    Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
-    Do_BSE(Mmn, Hqp);
-    _sigma_offdiags = "empty";
-    Hqp = Do_Diagonalize_QP(gw);
-    Do_BSE(Mmn, Hqp);
-    _sigma_offdiags = "exact1";
-    Hqp = Do_Diagonalize_QP(gw);
-    Do_BSE(Mmn, Hqp);
-    _sigma_offdiags = "exact2";
-    Hqp = Do_Diagonalize_QP(gw);
-    Do_BSE(Mmn, Hqp);
-  } else {
-    Eigen::MatrixXd Hqp = Do_Diagonalize_QP(gw);
-    Do_BSE(Mmn, Hqp);
-  }
-
-  return true;
-}
-
-Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
-
-  if (_do_gw) {
     XTP_LOG(Log::info, *_pLog)
         << TimeStamp() << " Calculating offdiagonal part of Sigma  " << flush;
-    XTP_LOG(Log::info, *_pLog)
-        << TimeStamp() << " Sigma off-diags: " << _sigma_offdiags << flush;
-    gw.CalculateHQP(_sigma_offdiags);
+    gw.CalculateHQP();
     XTP_LOG(Log::error, *_pLog)
         << TimeStamp() << " Calculated offdiagonal part of Sigma  " << flush;
-    Eigen::MatrixXd Hqp = gw.getHQP();
+    Hqp = gw.getHQP();
 
-    WriteMatrixBinary(gw.getSigma_c(),
-                      (boost::format("sigma_%s.bin") % _sigma_offdiags).str());
-    WriteMatrixBinary(Hqp,
-                      (boost::format("hqp_%s.bin") % _sigma_offdiags).str());
+    if (_export_gw_matrices) {
+      WriteMatrixBinary(gw.getSigma_c(), "sigma_c.bin");
+      WriteMatrixBinary(Hqp, "hqp.bin");
+    }
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es = gw.DiagonalizeHQP();
     if (es.info() == Eigen::ComputationInfo::Success) {
@@ -747,7 +726,6 @@ Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
 
     _orbitals.QPdiag().eigenvectors() = es.eigenvectors();
     _orbitals.QPdiag().eigenvalues() = es.eigenvalues();
-    return Hqp;
   } else {
     if (_orbitals.getGWAmax() != _gwopt.qpmax ||
         _orbitals.getGWAmin() != _gwopt.qpmin ||
@@ -758,12 +736,9 @@ Eigen::MatrixXd GWBSE::Do_Diagonalize_QP(GW& gw) const {
           ".orb file, rerun your GW calculation");
     }
     const Eigen::MatrixXd& qpcoeff = _orbitals.QPdiag().eigenvectors();
-    return qpcoeff * _orbitals.QPdiag().eigenvalues().asDiagonal() *
-           qpcoeff.transpose();
+    Hqp = qpcoeff * _orbitals.QPdiag().eigenvalues().asDiagonal() *
+          qpcoeff.transpose();
   }
-}
-
-void GWBSE::Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const {
 
   // proceed only if BSE requested
   if (_do_bse_singlets || _do_bse_triplets) {
@@ -786,6 +761,7 @@ void GWBSE::Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const {
   }
   XTP_LOG(Log::error, *_pLog)
       << TimeStamp() << " GWBSE calculation finished " << flush;
+  return true;
 }
 
 void GWBSE::WriteMatrixBinary(const Eigen::MatrixXd& matrix,

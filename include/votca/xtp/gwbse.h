@@ -92,9 +92,7 @@ class GWBSE {
 
   std::vector<QMFragment<BSE_Population> > _fragments;
 
-  std::string _sigma_offdiags = "approx";
-  Eigen::MatrixXd Do_Diagonalize_QP(GW& gw) const;
-  void Do_BSE(TCMatrix_gwbse& Mmn, Eigen::MatrixXd& Hqp) const;
+  bool _export_gw_matrices = false;  // Export Sigma_c, H_QP
 
   void WriteMatrixBinary(const Eigen::MatrixXd& matrix,
                          std::string filename) const;
