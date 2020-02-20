@@ -84,6 +84,9 @@ class GW {
                  std::string states) const;
 
   Eigen::MatrixXd getSigma_c() const { return _Sigma_c; }
+  Eigen::VectorXd RPAInputEnergies() const {
+    return _rpa.getRPAInputEnergies();
+  }
 
  private:
   Index _qptotal;
